@@ -15,7 +15,9 @@ import { Button } from "laya/ui/Button";
 import { Browser } from "laya/utils/Browser";
 import { Handler } from "laya/utils/Handler";
 import { Stat } from "laya/utils/Stat";
+import { Utils } from "laya/utils/Utils";
 import { Laya3D } from "Laya3D";
+import Client from "../../Client";
 import { CameraMoveScript } from "../common/CameraMoveScript";
 
 /**
@@ -42,6 +44,11 @@ export class BoneLinkSprite3D {
 	private _forward: Vector3 = new Vector3(-1.0, -1.0, -1.0);
 	private changeActionButton: Button;
 	private curStateIndex: number = 0;
+
+	/**实例类型*/
+	private btype:any = "BoneLinkSprite3D";
+	/**场景内按钮类型*/
+	private stype:any = 0;
 
 	constructor() {
 		//初始化引擎
@@ -153,62 +160,67 @@ export class BoneLinkSprite3D {
 			this.changeActionButton.scale(Browser.pixelRatio, Browser.pixelRatio);
 			this.changeActionButton.pos(Laya.stage.width / 2 - this.changeActionButton.width * Browser.pixelRatio / 2, Laya.stage.height - 100 * Browser.pixelRatio);
 
-			this.changeActionButton.on(Event.CLICK, this, function (): void {
-
-				this.curStateIndex++;
-				if (this.curStateIndex % 3 == 1) {
-
-					this.changeActionButton.label = "切换坐骑";
-
-					this.scene.addChild(this.dragon1);
-					this.aniSprte3D1.addChild(this.role);
-
-					//关联精灵节点到Avatar节点
-					this.dragonAnimator1.linkSprite3DToAvatarNode("point", this.role);
-
-					this.animator.play("ride");
-					this.dragonAnimator1.play("run");
-
-					this.pangzi.transform.localRotation = this._rotation;
-					this.pangzi.transform.localPosition = this._position;
-					this.pangzi.transform.localScale = this._scale;
-				}
-				else if (this.curStateIndex % 3 == 2) {
-
-					this.changeActionButton.label = "卸下坐骑";
-
-					//骨骼取消关联节点
-					this.dragonAnimator1.unLinkSprite3DToAvatarNode(this.role);
-					this.aniSprte3D1.removeChild(this.role);
-					this.dragon1.removeSelf();
-
-					this.scene.addChild(this.dragon2);
-					this.aniSprte3D2.addChild(this.role);
-					//骨骼关联节点
-					this.dragonAnimator2.linkSprite3DToAvatarNode("point", this.role);
-
-					this.animator.play("ride");
-					this.dragonAnimator2.play("run");
-
-					this.pangzi.transform.localRotation = this._rotation;
-					this.pangzi.transform.localPosition = this._position;
-					this.pangzi.transform.localScale = this._scale;
-				}
-				else {
-
-					this.changeActionButton.label = "乘骑坐骑";
-
-					//骨骼取消关联节点
-					this.dragonAnimator2.unLinkSprite3DToAvatarNode(this.role);
-					this.aniSprte3D2.removeChild(this.role);
-					this.dragon2.removeSelf();
-
-					this.scene.addChild(this.role);
-					this.animator.play("hello");
-				}
-			});
+			this.changeActionButton.on(Event.CLICK, this, this.stypeFun0);
 
 		}));
+	}
+
+	stypeFun0(label:string = "乘骑坐骑"): void {
+
+		this.curStateIndex++;
+		if (this.curStateIndex % 3 == 1) {
+
+			this.changeActionButton.label = "切换坐骑";
+
+			this.scene.addChild(this.dragon1);
+			this.aniSprte3D1.addChild(this.role);
+
+			//关联精灵节点到Avatar节点
+			this.dragonAnimator1.linkSprite3DToAvatarNode("point", this.role);
+
+			this.animator.play("ride");
+			this.dragonAnimator1.play("run");
+
+			this.pangzi.transform.localRotation = this._rotation;
+			this.pangzi.transform.localPosition = this._position;
+			this.pangzi.transform.localScale = this._scale;
+		}
+		else if (this.curStateIndex % 3 == 2) {
+
+			this.changeActionButton.label = "卸下坐骑";
+
+			//骨骼取消关联节点
+			this.dragonAnimator1.unLinkSprite3DToAvatarNode(this.role);
+			this.aniSprte3D1.removeChild(this.role);
+			this.dragon1.removeSelf();
+
+			this.scene.addChild(this.dragon2);
+			this.aniSprte3D2.addChild(this.role);
+			//骨骼关联节点
+			this.dragonAnimator2.linkSprite3DToAvatarNode("point", this.role);
+
+			this.animator.play("ride");
+			this.dragonAnimator2.play("run");
+
+			this.pangzi.transform.localRotation = this._rotation;
+			this.pangzi.transform.localPosition = this._position;
+			this.pangzi.transform.localScale = this._scale;
+		}
+		else {
+
+			this.changeActionButton.label = "乘骑坐骑";
+
+			//骨骼取消关联节点
+			this.dragonAnimator2.unLinkSprite3DToAvatarNode(this.role);
+			this.aniSprte3D2.removeChild(this.role);
+			this.dragon2.removeSelf();
+
+			this.scene.addChild(this.role);
+			this.animator.play("hello");
+		}
+
+		label = this.changeActionButton.label
+		Client.instance.send({type:"next",btype:this.btype,stype:0,value:label});
 	}
 }
 

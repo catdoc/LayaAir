@@ -99,17 +99,17 @@ export class Image extends UIComponent {
      * 创建一个 <code>Image</code> 实例。
      * @param skin 皮肤资源地址。
      */
-    constructor(skin: string = null) {
+    constructor(skin: string|null = null) {
         super();
         this.skin = skin;
     }
 
-		/**
-		 * @inheritDoc 
-		 * @override
-		*/
-		/*override*/  destroy(destroyChild: boolean = true): void {
-        super.destroy(true);
+    /**
+     * @inheritDoc 
+     * @override
+     */
+	destroy(destroyChild: boolean = true): void {
+        super.destroy(destroyChild);
         this._bitmap && this._bitmap.destroy();
         this._bitmap = null;
     }
@@ -122,11 +122,11 @@ export class Image extends UIComponent {
         ILaya.loader.clearRes(this._skin);
     }
 
-		/**
-		 * @inheritDoc 
-		 * @override
-		*/
-		/*override*/ protected createChildren(): void {
+    /**
+     * @inheritDoc 
+     * @override
+     */
+	protected createChildren(): void {
         this.graphics = this._bitmap = new AutoBitmap();
         this._bitmap.autoCacheCmd = false;
     }
@@ -144,7 +144,7 @@ export class Image extends UIComponent {
         if (this._skin != value) {
             this._skin = value;
             if (value) {
-                var source: Texture = Loader.getRes(value);
+                var source = Loader.getRes(value) as Texture;
                 if (source) {
                     this.source = source;
                     this.onCompResize();
@@ -191,26 +191,26 @@ export class Image extends UIComponent {
         }
     }
 
-		/**
-		 * @inheritDoc 
-		 * @override
-		*/
-		/*override*/ protected measureWidth(): number {
+    /**
+     * @inheritDoc 
+     * @override
+     */
+	protected measureWidth(): number {
         return this._bitmap.width;
     }
 
-		/**
-		 * @inheritDoc 
-		 * @override
-		*/
-		/*override*/ protected measureHeight(): number {
+    /**
+     * @inheritDoc 
+     * @override
+     */
+	protected measureHeight(): number {
         return this._bitmap.height;
     }
 
     /**
      * @inheritDoc 
      * @override
-    */
+     */
 	set width(value: number) {
         super.width = value;
         this._bitmap.width = value == 0 ? 0.0000001 : value;

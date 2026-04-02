@@ -6,9 +6,18 @@ import { Vector4 } from "../math/Vector4"
  * <code>QuaternionKeyframe</code> 类用于创建四元数关键帧实例。
  */
 export class QuaternionKeyframe extends Keyframe {
+	/**内切线 */
 	inTangent: Vector4 = new Vector4();
+	/**外切线 */
 	outTangent: Vector4 = new Vector4();
+	/**帧数据 */
 	value: Quaternion = new Quaternion();
+	/**内权重 */
+	inWeight: Vector4 = new Vector4();
+	/**外权重 */
+	outWeight: Vector4 = new Vector4();
+	/**权重模式*/
+	weightedMode: Vector4 = new Vector4();
 
 	/**
 	 * 创建一个 <code>QuaternionKeyframe</code> 实例。
@@ -31,14 +40,4 @@ export class QuaternionKeyframe extends Keyframe {
 		this.value.cloneTo(destKeyFarme.value);
 	}
 }
-
-// native
-/*if ((window as any).conch && (window as any).conchFloatArrayKeyframe) {
-	//@ts-ignore
-	QuaternionKeyframe = (window as any).conchFloatArrayKeyframe;
-}
-if ((window as any).qq && (window as any).qq.webglPlus) {
-	//@ts-ignore
-	QuaternionKeyframe = (window as any).qq.webglPlus.conchFloatArrayKeyframe;
-}*/
 

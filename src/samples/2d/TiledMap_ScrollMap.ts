@@ -1,4 +1,5 @@
 import { Laya } from "Laya";
+import { Stage } from "laya/display/Stage";
 import { Event } from "laya/events/Event";
 import { TiledMap } from "laya/map/TiledMap";
 import { Rectangle } from "laya/maths/Rectangle";
@@ -24,7 +25,7 @@ export class TiledMap_ScrollMap {
 
 		// 不支持WebGL时自动切换至Canvas
 		Laya.init(Browser.clientWidth, Browser.clientHeight, WebGL);
-		//			Laya.stage.scaleMode = Stage.SCALE_FULL;
+		//Laya.stage.scaleMode = Stage.SCALE_FULL;
 		Stat.show();
 
 		this.createMap();
@@ -88,7 +89,7 @@ export class TiledMap_ScrollMap {
 		Laya.stage.off(Event.MOUSE_MOVE, this, this.mouseMove);
 		if (this.tiledMap) {
 			this.tiledMap.destroy();
-			Resource.destroyUnusedResources();
+			// Resource.destroyUnusedResources();
 		}
 	}
 }

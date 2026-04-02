@@ -11,8 +11,12 @@ import { Matrix4x4 } from "../math/Matrix4x4";
 import { Quaternion } from "../math/Quaternion";
 import { Vector3 } from "../math/Vector3";
 import { Vector4 } from "../math/Vector4";
-import { Physics3D } from "../physics/Physics3D";
 import { TextureGenerator } from "../resource/TextureGenerator";
+import { ILaya3D } from "../../../ILaya3D";
+import { RenderTexture } from "../resource/RenderTexture";
+import { RenderTextureFormat } from "../../resource/RenderTextureFormat";
+import { Render } from "../../renders/Render";
+import { HTMLCanvas } from "../../resource/HTMLCanvas";
 
 /**
  * <code>Utils3D</code> 类用于创建3D工具。
@@ -42,7 +46,7 @@ export class Utils3D {
 	 * @internal
 	 */
 	static _convertToLayaVec3(bVector: number, out: Vector3, inverseX: boolean): void {
-		var bullet: any = Physics3D._bullet;
+		var bullet: any = ILaya3D.Physics3D._bullet;
 		out.x = inverseX ? - bullet.btVector3_x(bVector) : bullet.btVector3_x(bVector);
 		out.y = bullet.btVector3_y(bVector);
 		out.z = bullet.btVector3_z(bVector);
@@ -52,7 +56,7 @@ export class Utils3D {
 	 * @internal
 	 */
 	static _convertToBulletVec3(lVector: Vector3, out: number, inverseX: boolean): void {
-		Physics3D._bullet.btVector3_setValue(out, inverseX ? -lVector.x : lVector.x, lVector.y, lVector.z);
+		ILaya3D.Physics3D._bullet.btVector3_setValue(out, inverseX ? -lVector.x : lVector.x, lVector.y, lVector.z);
 	}
 
 	/**
@@ -114,7 +118,7 @@ export class Utils3D {
 		se[5] = sy;
 		se[10] = sz;
 
-		var i: number, a: Float32Array, b: Float32Array, e: Float32Array, ai0: number, ai1: number, ai2: number, ai3: number;
+		var i: number, ai0: number, ai1: number, ai2: number, ai3: number;
 		//mul(rMat, tMat, tsMat)......................................
 		for (i = 0; i < 4; i++) {
 			ai0 = re[i];
@@ -374,7 +378,7 @@ export class Utils3D {
 	}
 
 	/**
-	 * 通过矩阵转换一个三维向量数组到另外一个归一化的三维向量数组。
+	 * 通过矩阵转换一个三维向量数组到另外一个三维向量数组。
 	 * @param	source 源三维向量所在数组。
 	 * @param	sourceOffset 源三维向量数组偏移。
 	 * @param	transform  变换矩阵。
@@ -393,6 +397,14 @@ export class Utils3D {
 		result[resultOffset + 2] = (coordinateX * transformElem[2]) + (coordinateY * transformElem[6]) + (coordinateZ * transformElem[10]) + transformElem[14] / w;
 	}
 
+	/**
+	 * 通过矩阵转换一个三维向量数组到另外一个归一化的三维向量数组。
+	 * @param source 源三维向量所在数组。
+	 * @param sourceOffset 源三维向量数组偏移。
+	 * @param transform 变换矩阵。
+	 * @param result 输出三维向量所在数组。
+	 * @param resultOffset 输出三维向量数组偏移。
+	 */
 	static transformVector3ArrayToVector3ArrayNormal(source: Float32Array, sourceOffset: number, transform: Matrix4x4, result: Float32Array, resultOffset: number): void {
 		var coordinateX: number = source[sourceOffset + 0];
 		var coordinateY: number = source[sourceOffset + 1];
@@ -485,6 +497,7 @@ export class Utils3D {
 		e[outOffset + 15] = (l41 * r14) + (l42 * r24) + (l43 * r34) + (l44 * r44);
 	}
 
+	/**@internal */
 	private static arcTanAngle(x: number, y: number): number {
 
 		if (x == 0) {
@@ -502,7 +515,8 @@ export class Utils3D {
 		return 0;
 	}
 
-	private static angleTo(from: Vector3, location: Vector3, angle: Vector3): void {
+	/**@internal */
+	static angleTo(from: Vector3, location: Vector3, angle: Vector3): void {
 
 		Vector3.subtract(location, from, Quaternion.TEMPVector30);
 		Vector3.normalize(Quaternion.TEMPVector30, Quaternion.TEMPVector30);
@@ -511,6 +525,12 @@ export class Utils3D {
 		angle.y = Utils3D.arcTanAngle(-Quaternion.TEMPVector30.z, -Quaternion.TEMPVector30.x);
 	}
 
+	/**
+	 * 四元数旋转矩阵
+	 * @param source 源数据
+	 * @param rotation 旋转四元数Array
+	 * @param out 输出数据
+	 */
 	static transformQuat(source: Vector3, rotation: Float32Array, out: Vector3): void {
 		var re: Float32Array = rotation;
 
@@ -523,6 +543,12 @@ export class Utils3D {
 		out.z = iz * qw + iw * -qz + ix * -qy - iy * -qx;
 	}
 
+	/**
+	 * 修改四元数权重
+	 * @param f 元数据
+	 * @param weight 权重
+	 * @param e 目标数据
+	 */
 	static quaternionWeight(f: Quaternion, weight: number, e: Quaternion): void {
 		e.x = f.x * weight;
 		e.y = f.y * weight;
@@ -565,7 +591,7 @@ export class Utils3D {
 	}
 
 
-
+	/**@internal */
 	static matrix4x4MultiplyFFF(a: Float32Array, b: Float32Array, e: Float32Array): void {
 
 		var i: number, ai0: number, ai1: number, ai2: number, ai3: number;
@@ -593,10 +619,12 @@ export class Utils3D {
 		}
 	}
 
+	/**@internal */
 	static matrix4x4MultiplyFFFForNative(a: Float32Array, b: Float32Array, e: Float32Array): void {
 		(<any>LayaGL.instance).matrix4x4Multiply(a, b, e);
 	}
 
+	/**@internal */
 	static matrix4x4MultiplyMFM(left: Matrix4x4, right: Float32Array, out: Matrix4x4): void {
 		Utils3D.matrix4x4MultiplyFFF(left.elements, right, out.elements);
 	}
@@ -716,6 +744,74 @@ export class Utils3D {
 		}
 		return sprite;
 	}
+
+
+	/**
+	 * 将RenderTexture转换为Base64
+	 * @param rendertexture 渲染Buffer
+	 * @returns 
+	 */
+	static uint8ArrayToArrayBuffer(rendertexture: RenderTexture)
+	{
+		
+		let pixelArray:Uint8Array|Float32Array;
+		let width = rendertexture.width;
+		let height = rendertexture.height;
+		switch(rendertexture.format){
+			case RenderTextureFormat.R8G8B8:
+				pixelArray = new Uint8Array(width*height*4);
+				break;
+			case RenderTextureFormat.R8G8B8A8:
+				pixelArray = new Uint8Array(width*height*4);
+				break;
+			case RenderTextureFormat.R16G16B16A16:
+				pixelArray = new Float32Array(width*height*4);
+				break;
+			default:
+				throw "this function is not surpprt "+rendertexture.format.toString()+"format Material";
+		}
+		rendertexture.getData(0,0,rendertexture.width,rendertexture.height,pixelArray);
+		//tranceTo
+		switch(rendertexture.format){
+			case RenderTextureFormat.R16G16B16A16:
+				let ori = pixelArray;
+				let trans = new Uint8Array(width*height*4);
+				for(let i = 0,n = ori.length;i<n;i++){
+					trans[i] =Math.min(Math.floor(ori[i]*255),255);
+				}
+				pixelArray = trans;
+				break;
+		}
+		
+		let pixels = pixelArray;
+		var bs:String;
+		if (Render.isConchApp)
+		{
+			//TODO:
+			//var base64img=__JS__("conchToBase64('image/png',1,pixels,canvasWidth,canvasHeight)");
+			//var l = base64img.split(",");
+			//if (isBase64)
+			//	return base64img;
+			//return base.utils.DBUtils.decodeArrayBuffer(l[1]);
+		}
+		else
+		{
+				var canv:HTMLCanvas = new HTMLCanvas(true);
+				canv.lock = true;
+				canv.size(width, height);
+				var ctx2d = canv.getContext('2d');
+				//@ts-ignore
+				var imgdata:ImageData =ctx2d.createImageData(width, height);
+				//@ts-ignore
+				imgdata.data.set(new Uint8ClampedArray(pixels));
+				//@ts-ignore
+				ctx2d.putImageData(imgdata, 0, 0);;
+				bs = canv.source.toDataURL();
+				canv.destroy();
+		}
+		return bs;
+	}
+
 
 
 }

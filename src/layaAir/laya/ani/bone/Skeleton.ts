@@ -402,7 +402,7 @@ export class Skeleton extends Sprite {
 	 * @param	autoKey true为正常更新，false为index手动更新
 	 */
 	private _update(autoKey: boolean = true): void {
-		if (this._pause) return;
+		if (autoKey && this._pause) return;
 		if (autoKey && this._indexControl) {
 			return;
 		}
@@ -444,10 +444,10 @@ export class Skeleton extends Sprite {
 					}
 				}
 			} else if (tEventData.time < this._player.playStart && this._playAudio && tEventData.audioValue && tEventData.audioValue !== "null" && tEventData.audioValue !== "undefined") {
-					this._eventIndex++;
-					_soundChannel = SoundManager.playSound((this._player.templet as any)._path + tEventData.audioValue, 1, Handler.create(this, this._onAniSoundStoped), null,  (this._player.currentPlayTime - tEventData.time) / 1000);
-					SoundManager.playbackRate = this._player.playbackRate;
-					_soundChannel && this._soundChannelArr.push(_soundChannel);
+				this._eventIndex++;
+				_soundChannel = SoundManager.playSound((this._player.templet as any)._path + tEventData.audioValue, 1, Handler.create(this, this._onAniSoundStoped), null, (this._player.currentPlayTime - tEventData.time) / 1000);
+				SoundManager.playbackRate = this._player.playbackRate;
+				_soundChannel && this._soundChannelArr.push(_soundChannel);
 			} else {
 				this._eventIndex++;
 			}
@@ -951,6 +951,7 @@ export class Skeleton extends Sprite {
 					}
 				}
 				this._graphicsCache[i].length = 0;
+				this._graphicsCache[i] = [];
 			}
 		}
 	}
@@ -1103,13 +1104,13 @@ export class Skeleton extends Sprite {
 		this._graphicsCache[aniIndex][frameIndex] = graphics;
 	}
 
-		/**
-		 * 销毁当前动画
-		 * @override
-		 */
-		destroy(destroyChild: boolean = true): void {
+	/**
+	 * 销毁当前动画
+	 * @override
+	 */
+	destroy(destroyChild: boolean = true): void {
 		super.destroy(destroyChild);
-		this._templet._removeReference(1);
+		this._templet && this._templet._removeReference(1);
 		this._templet = null;//动画解析器
 		if (this._player) this._player.offAll();
 		this._player = null;// 播放器
@@ -1139,6 +1140,13 @@ export class Skeleton extends Sprite {
 			this._index = value;
 			this._player.currentTime = this._index * 1000 / this._player.cacheFrameRate;
 			this._indexControl = true;
+			if (this._aniClipIndex < 0 || this._aniClipIndex >= this.getAnimNum()) {
+				this._aniClipIndex = 0;
+				this._currAniIndex = 0;
+				this._curOriginalData = new Float32Array(this._templet.getTotalkeyframesLength(this._currAniIndex));
+				this._drawOrder = null;
+				this._eventIndex = 0;
+			}
 			this._update(false);
 		}
 	}

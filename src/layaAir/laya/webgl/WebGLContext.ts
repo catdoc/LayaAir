@@ -3,10 +3,18 @@ import { LayaGL } from "../layagl/LayaGL";
 
 /**
  * @private
+ * 
+ * iOS的下 sFactor !== WebGLContext._sFactor 这个判断有问题，但是 sFactor!=_sFactor却没有问题，不知道为什么
+ */
+var  _sFactor=1;
+var  _dFactor=0;
+
+/**
+ * @private
  */
 export class WebGLContext {
     /**@internal */
-    private static _activeTextures: any[] = new Array(8);
+    private static _activeTextures: Array<number> = new Array(1);
     /**@internal */
     private static _useProgram: any = null;
     /**@internal */
@@ -15,6 +23,23 @@ export class WebGLContext {
     private static _depthMask: boolean = true;
     /**@internal */
     private static _depthFunc: number;
+    /**@internal */
+    private static _stencilTest: boolean = false;
+    /**@internal */
+    private static _stencilFunc:number;
+    /**@internal */
+    private static _stencilMask:boolean;
+    /**@internal */
+    private static _stencilRef:number
+    /**@internal */
+    private static _stencilOp:number;
+    /**@internal */
+    private static _stencilOp_fail:number;
+    /**@internal */
+    private static _stencilOp_zfail:number;
+    /**@internal */
+    private static _stencilOp_zpass:number;
+    
     /**@internal */
     private static _blend: boolean = false;
     /**@internal */
@@ -41,9 +66,11 @@ export class WebGLContext {
     private static _frontFace: number;
     /**@internal */
     private static _activedTextureID: number;
+    /**@internal */
+    private static _maxUniformFragmentVectors:number;
 
     /**@internal */
-    static _glTextureIDs: any[];
+    static _glTextureIDs: Array<number>;
 
     /**@internal */
     static mainContext: WebGLRenderingContext = null;
@@ -58,12 +85,17 @@ export class WebGLContext {
         WebGLContext._blendEquation = gl.FUNC_ADD;
         WebGLContext._blendEquationRGB = gl.FUNC_ADD;
         WebGLContext._blendEquationAlpha = gl.FUNC_ADD;
-        WebGLContext._sFactor = gl.ONE;
-        WebGLContext._dFactor = gl.ZERO;
+        _sFactor = gl.ONE;	// 由于有iOS的问题，先改成普通的全局变量
+        _dFactor = gl.ZERO;
         WebGLContext._sFactorAlpha = gl.ONE;
         WebGLContext._dFactorAlpha = gl.ZERO;
         WebGLContext._activedTextureID = gl.TEXTURE0;//默认激活纹理区为0
-        WebGLContext._glTextureIDs = [gl.TEXTURE0, gl.TEXTURE1, gl.TEXTURE2, gl.TEXTURE3, gl.TEXTURE4, gl.TEXTURE5, gl.TEXTURE6, gl.TEXTURE7];
+        var maxTexturenum:number = gl.getParameter(gl.MAX_VERTEX_TEXTURE_IMAGE_UNITS);
+        WebGLContext._activeTextures = new Array(maxTexturenum);
+        WebGLContext._glTextureIDs = [gl.TEXTURE0, gl.TEXTURE1, gl.TEXTURE2, gl.TEXTURE3, gl.TEXTURE4, gl.TEXTURE5, gl.TEXTURE6, gl.TEXTURE7,gl.TEXTURE8,gl.TEXTURE9,gl.TEXTURE10,gl.TEXTURE11,gl.TEXTURE12,gl.TEXTURE13,gl.TEXTURE14,gl.TEXTURE15,gl.TEXTURE16,gl.TEXTURE17,gl.TEXTURE18,gl.TEXTURE19,gl.TEXTURE20,gl.TEXTURE21,gl.TEXTURE22,gl.TEXTURE23,gl.TEXTURE24,gl.TEXTURE25,gl.TEXTURE26,gl.TEXTURE27,gl.TEXTURE28,gl.TEXTURE29,gl.TEXTURE30,gl.TEXTURE31];
+        var maxVertexUniform:number = gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS);
+        var maxFragUniform:number = gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS);
+        WebGLContext._maxUniformFragmentVectors = Math.min(maxVertexUniform,maxFragUniform);
     }
 
 	/**
@@ -99,6 +131,49 @@ export class WebGLContext {
         value !== WebGLContext._depthFunc && (WebGLContext._depthFunc = value, gl.depthFunc(value));
     }
 
+    /**
+     * @internal
+     */
+    static setStencilTest(gl: WebGLRenderingContext, value: boolean):void{
+        value !==WebGLContext._stencilTest && (WebGLContext._stencilTest = value,value?gl.enable(gl.STENCIL_TEST):gl.disable(gl.STENCIL_TEST));
+    }
+
+    /**
+     * 模板写入开关
+     * @param gl 
+     * @param value 
+     */
+    static setStencilMask(gl: WebGLRenderingContext, value: boolean): void {
+
+        value !== WebGLContext._stencilMask && (WebGLContext._stencilMask = value, value?gl.stencilMask(0xff):gl.stencilMask(0x00));
+    }
+
+    /**
+     * @internal
+     */
+    static setStencilFunc(gl:WebGLRenderingContext, fun: number,ref:number):void{
+        if(fun!=WebGLContext._stencilFunc||ref!=WebGLContext._stencilRef){
+            WebGLContext._stencilFunc = fun;
+            WebGLContext._stencilRef = ref;
+            gl.stencilFunc(fun,ref,0xff);
+        }
+    }
+
+     /**
+     * @internal
+     */
+    static setstencilOp(gl:WebGLRenderingContext,fail:number,zfail:number,zpass:number){
+        if(WebGLContext._stencilOp_fail!=fail||WebGLContext._stencilOp_zfail!=zfail||WebGLContext._stencilOp_zpass!=zpass){
+            WebGLContext._stencilOp_fail=fail;
+            WebGLContext._stencilOp_zfail=zfail;
+            WebGLContext._stencilOp_zpass=zpass;
+            gl.stencilOp(fail, zfail, zpass);
+        }
+        
+    }
+
+
+
 	/**
 	 * @internal
 	 */
@@ -133,9 +208,10 @@ export class WebGLContext {
 	 * @internal
 	 */
     static setBlendFunc(gl: WebGLRenderingContext, sFactor: number, dFactor: number,force:boolean=false): void {
-        if (force || sFactor !== WebGLContext._sFactor || dFactor !== WebGLContext._dFactor) {
-            WebGLContext._sFactor = sFactor;
-            WebGLContext._dFactor = dFactor;
+		// 有个iOS的bug，用原来的写法有时候会出错
+        if (force || sFactor !== _sFactor || dFactor !== _dFactor) {
+            _sFactor = sFactor;
+            _dFactor = dFactor;
             WebGLContext._sFactorRGB = null;
             WebGLContext._dFactorRGB = null;
             WebGLContext._sFactorAlpha = null;
@@ -153,8 +229,8 @@ export class WebGLContext {
             WebGLContext._dFactorRGB = dstRGB;
             WebGLContext._sFactorAlpha = srcAlpha;
             WebGLContext._dFactorAlpha = dstAlpha;
-            WebGLContext._sFactor = null;
-            WebGLContext._dFactor = null;
+            _sFactor = null;
+            _dFactor = null;
             gl.blendFuncSeparate(srcRGB, dstRGB, srcAlpha, dstAlpha);
         }
     }
@@ -296,6 +372,10 @@ export class WebGLContext {
 	 */
     static bindVertexArrayForNative(gl: WebGLContext, vertexArray: any): void {
         (gl as any).bindVertexArray(vertexArray);
+    }
+
+    static getUniformMaxVector():number{
+        return WebGLContext._maxUniformFragmentVectors;
     }
 
 }

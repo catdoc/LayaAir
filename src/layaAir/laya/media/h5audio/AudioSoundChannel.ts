@@ -135,6 +135,8 @@ export class AudioSoundChannel extends SoundChannel {
     pause(): void {
         this.isStopped = true;
         ILaya.SoundManager.removeChannel(this);
+        if (!this._audio)
+            return;
         if ("pause" in this._audio)
             this._audio.pause();
         if (ILaya.SoundManager.autoReleaseSound)
@@ -151,7 +153,7 @@ export class AudioSoundChannel extends SoundChannel {
         if (audio.readyState == 0) { //当音频放到后台一定时间后，会被卸载，音频会断开连接，并将readyState重置为0
             audio.src = this.url;
             audio.addEventListener("canplay", this._resumePlay as any);
-            audio.load();
+            audio.load && audio.load();
         }
         ILaya.SoundManager.addChannel(this);
         if ("play" in audio) {

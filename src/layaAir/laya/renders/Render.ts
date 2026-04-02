@@ -13,6 +13,7 @@ import { Buffer2D } from "../webgl/utils/Buffer2D"
 import { SubmitBase } from "../webgl/submit/SubmitBase";
 import { LayaGPU } from "../webgl/LayaGPU";
 import { Browser } from "../utils/Browser";
+import { RenderInfo } from "./RenderInfo";
 
 /**
  * <code>Render</code> 是渲染管理类。它是一个单例，可以使用 Laya.render 访问。
@@ -23,20 +24,33 @@ export class Render {
     /** @internal 主画布。canvas和webgl渲染都用这个画布*/
     static _mainCanvas: HTMLCanvas;
 
-    static supportWebGLPlusCulling: boolean = false;
+    // static supportWebGLPlusCulling: boolean = false;
     static supportWebGLPlusAnimation: boolean = false;
     static supportWebGLPlusRendering: boolean = false;
     /**是否是加速器 只读*/
     static isConchApp: boolean = false;
     /** 表示是否是 3D 模式。*/
     static is3DMode: boolean;
+    /**自定义帧循环 */
+    static _customRequestAnimationFrame:any;
+    /**帧循环函数 */
+    static _loopFunction:any;
 
+    static _Render:Render;
+
+    static customRequestAnimationFrame(value:any,loopFun:any){
+        Render._customRequestAnimationFrame = value;
+        Render._loopFunction = loopFun;
+    }
+
+    
 	/**
 	 * 初始化引擎。
 	 * @param	width 游戏窗口宽度。
 	 * @param	height	游戏窗口高度。
 	 */
     constructor(width: number, height: number, mainCanv: HTMLCanvas) {
+        Render._Render = this;
         Render._mainCanvas = mainCanv;
         let source: HTMLCanvasElement = Render._mainCanvas.source as HTMLCanvasElement;
         //创建主画布。改到Browser中了，因为为了runtime，主画布必须是第一个
@@ -48,10 +62,14 @@ export class Render {
         }
 
         this.initRender(Render._mainCanvas, width, height);
-        window.requestAnimationFrame(loop);
+        requestAnimationFrame(loop);
         function loop(stamp: number): void {
             ILaya.stage._loop();
-            window.requestAnimationFrame(loop);
+            if(!!Render._customRequestAnimationFrame&&!!Render._loopFunction){
+                Render._customRequestAnimationFrame(Render._loopFunction);
+            }
+            else
+            requestAnimationFrame(loop);
         }
         ILaya.stage.on("visibilitychange", this, this._onVisibilitychange);
     }
@@ -89,6 +107,8 @@ export class Render {
             return null;
         }
         var gl: WebGLRenderingContext = LayaGL.instance = WebGLContext.mainContext = getWebGLContext(Render._mainCanvas.source);
+        if(Config.printWebglOrder)
+           this._replaceWebglcall(gl);
 
         if (!gl)
             return false;
@@ -115,6 +135,31 @@ export class Render {
     }
 
     /**@private */
+    private _replaceWebglcall(gl:any){
+        var tempgl:{[key:string]:any} = {};
+        for(const key in gl){
+            if(typeof gl[key]=="function"&& key != "getError" && key != "__SPECTOR_Origin_getError" && key !="__proto__"){
+                tempgl[key] = gl[key];
+                gl[key] = function() {
+                    let arr:IArguments[] = [];
+                    for(let i = 0;i<arguments.length;i++){
+                        arr.push(arguments[i]);
+                    }
+                    let result = tempgl[key].apply(gl,arr);
+                    
+                    console.log(RenderInfo.loopCount+":gl."+key+":"+arr);
+                    let err = gl.getError();
+                    if(err){
+                        console.log(err);
+                        debugger;
+                    }
+                    return result;
+                }
+            }
+        }
+    }
+
+    /**@private */
     private _enterFrame(e: any = null): void {
         ILaya.stage._loop();
     }
@@ -132,13 +177,13 @@ export class Render {
 {
     Render.isConchApp = ((window as any).conch != null);
     if (Render.isConchApp) {
-        Render.supportWebGLPlusCulling = false;
-        Render.supportWebGLPlusAnimation = false;
+        //Render.supportWebGLPlusCulling = false;
+        //Render.supportWebGLPlusAnimation = false;
         Render.supportWebGLPlusRendering = false;
     }
     else if ((window as any).qq != null && (window as any).qq.webglPlus != null) {
-        Render.supportWebGLPlusCulling = false;
-        Render.supportWebGLPlusAnimation = false;
+        //Render.supportWebGLPlusCulling = false;
+        //Render.supportWebGLPlusAnimation = false;
         Render.supportWebGLPlusRendering = false;
     }
 }

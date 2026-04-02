@@ -1,11 +1,11 @@
 import { RenderElement } from "./RenderElement";
-import { BaseCamera } from "../BaseCamera"
 import { Scene3D } from "../scene/Scene3D"
 import { Matrix4x4 } from "../../math/Matrix4x4"
 import { Viewport } from "../../math/Viewport"
 import { ShaderInstance } from "../../shader/ShaderInstance"
 import { ShaderData } from "../../shader/ShaderData";
 import { Camera } from "../Camera";
+import { Shader3D } from "laya/d3/shader/Shader3D";
 
 /**
  * <code>RenderContext3D</code> 类用于实现渲染状态。
@@ -42,7 +42,13 @@ export class RenderContext3D {
 	invertY: boolean = false;
 	/** @internal */
 	pipelineMode: string;
+	/**设置渲染管线 */
+	configPipeLineMode:string = "Forward";
 
+	/**@internal */
+	customShader:Shader3D;
+	/**@internal */
+	replaceTag:string;
 	/**
 	 * 创建一个 <code>RenderContext3D</code> 实例。
 	 */

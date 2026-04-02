@@ -12,7 +12,9 @@ import { Button } from "laya/ui/Button";
 import { Browser } from "laya/utils/Browser";
 import { Handler } from "laya/utils/Handler";
 import { Stat } from "laya/utils/Stat";
+import { Utils } from "laya/utils/Utils";
 import { Laya3D } from "Laya3D";
+import Client from "../../Client";
 import { CameraMoveScript } from "../common/CameraMoveScript";
 
 /**
@@ -29,7 +31,13 @@ export class ChangeMesh {
 	private cylinder: Mesh;
 	private cone: Mesh;
 
+	/**实例类型*/
+	private btype:any = "ChangeMesh";
+	/**场景内按钮类型*/
+	private stype:any = 0;
+
 	constructor() {
+
 		//初始化引擎
 		Laya3D.init(0, 0);
 		Laya.stage.scaleMode = Stage.SCALE_FULL;
@@ -39,7 +47,6 @@ export class ChangeMesh {
 		//预加载所有资源
 		var resource: any[] = ["res/threeDimen/scene/ChangeMaterialDemo/Conventional/scene.ls"];
 		Laya.loader.create(resource, Handler.create(this, this.onPreLoadFinish));
-
 	}
 
 	onPreLoadFinish() {
@@ -75,27 +82,30 @@ export class ChangeMesh {
 			this.changeActionButton.scale(Browser.pixelRatio, Browser.pixelRatio);
 			this.changeActionButton.pos(Laya.stage.width / 2 - this.changeActionButton.width * Browser.pixelRatio / 2, Laya.stage.height - 100 * Browser.pixelRatio);
 
-			this.changeActionButton.on(Event.CLICK, this, function (): void {
-				this.index++;
-				if (this.index % 5 === 1) {
-					//切换mesh
-					this.sphere.meshFilter.sharedMesh = this.box;
-				} else if (this.index % 5 === 2) {
-					//切换mesh
-					this.sphere.meshFilter.sharedMesh = this.capsule;
-				} else if (this.index % 5 === 3) {
-					//切换mesh
-					this.sphere.meshFilter.sharedMesh = this.cylinder;
-				} else if (this.index % 5 === 3) {
-					//切换mesh
-					this.sphere.meshFilter.sharedMesh = this.cone;
-				} else {
-					//切换mesh
-					this.sphere.meshFilter.sharedMesh = this.sphereMesh;
-				}
-			});
-
+			this.changeActionButton.on(Event.CLICK, this, this.stypeFun0);
 		}));
+	}
+
+	stypeFun0(index: number = 0): void {
+		this.index++;
+		if (this.index % 5 === 1) {
+			//切换mesh
+			this.sphere.meshFilter.sharedMesh = this.box;
+		} else if (this.index % 5 === 2) {
+			//切换mesh
+			this.sphere.meshFilter.sharedMesh = this.capsule;
+		} else if (this.index % 5 === 3) {
+			//切换mesh
+			this.sphere.meshFilter.sharedMesh = this.cylinder;
+		} else if (this.index % 5 === 3) {
+			//切换mesh
+			this.sphere.meshFilter.sharedMesh = this.cone;
+		} else {
+			//切换mesh
+			this.sphere.meshFilter.sharedMesh = this.sphereMesh;
+		}
+		index = this.index;
+		Client.instance.send({type:"next",btype:this.btype,stype:0,value:index});
 	}
 
 }

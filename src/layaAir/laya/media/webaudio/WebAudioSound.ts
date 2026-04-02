@@ -2,7 +2,6 @@ import { WebAudioSoundChannel } from "./WebAudioSoundChannel";
 import { Event } from "../../events/Event"
 import { EventDispatcher } from "../../events/EventDispatcher"
 import { SoundChannel } from "../SoundChannel"
-//import { SoundManager } from "../SoundManager"
 import { URL } from "../../net/URL"
 import { ILaya } from "../../../ILaya";
 
@@ -17,12 +16,12 @@ export class WebAudioSound extends EventDispatcher {
     /**
      * 是否支持web audio api
      */
-    static webAudioEnabled: boolean = window["AudioContext"] || window["webkitAudioContext"] || window["mozAudioContext"];
+    static webAudioEnabled: boolean = window["AudioContext"] || (window as any)["webkitAudioContext"] || (window as any)["mozAudioContext"];
 
     /**
      * 播放设备
      */
-    static ctx: any = WebAudioSound.webAudioEnabled ? new (window["AudioContext"] || window["webkitAudioContext"] || window["mozAudioContext"])() : undefined;
+    static ctx: any = WebAudioSound.webAudioEnabled ? new (window["AudioContext"] || (window as any)["webkitAudioContext"] || (window as any)["mozAudioContext"])() : undefined;
 
     /**
      * 当前要解码的声音文件列表
@@ -241,7 +240,7 @@ export class WebAudioSound extends EventDispatcher {
      * @return
      *
      */
-    play(startTime: number = 0, loops: number = 0, channel: SoundChannel = null): SoundChannel {
+    play(startTime: number = 0, loops: number = 0, channel: WebAudioSoundChannel = null): SoundChannel {
         channel = channel ? channel : new WebAudioSoundChannel();
         if (!this.audioBuffer) {
             if (this.url) {
@@ -253,7 +252,7 @@ export class WebAudioSound extends EventDispatcher {
         }
         channel.url = this.url;
         channel.loops = loops;
-        channel["audioBuffer"] = this.audioBuffer;
+        channel.audioBuffer = this.audioBuffer;
         channel.startTime = startTime;
         channel.play();
         ILaya.SoundManager.addChannel(channel);

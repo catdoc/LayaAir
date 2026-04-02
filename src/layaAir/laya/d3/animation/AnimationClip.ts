@@ -2,14 +2,11 @@ import { AnimationClipParser03 } from "./AnimationClipParser03";
 import { AnimationClipParser04 } from "./AnimationClipParser04";
 import { KeyframeNodeList } from "./KeyframeNodeList";
 import { AnimationEvent } from "./AnimationEvent";
-import { KeyframeNode } from "./KeyframeNode";
 import { FloatKeyframe } from "../core/FloatKeyframe"
-import { Keyframe } from "../core/Keyframe"
 import { QuaternionKeyframe } from "../core/QuaternionKeyframe"
 import { Vector3Keyframe } from "../core/Vector3Keyframe"
 import { Quaternion } from "../math/Quaternion"
 import { Vector3 } from "../math/Vector3"
-import { Vector4 } from "../math/Vector4"
 import { Utils3D } from "../utils/Utils3D"
 import { LayaGL } from "../../layagl/LayaGL"
 import { Resource } from "../../resource/Resource"
@@ -18,6 +15,8 @@ import { Handler } from "../../utils/Handler"
 import { ILaya } from "../../../ILaya";
 import { ConchVector3 } from "../math/Native/ConchVector3";
 import { ConchQuaternion } from "../math/Native/ConchQuaternion";
+import { AvatarMask } from "../component/AvatarMask";
+import { WeightedMode } from "../core/Keyframe";
 
 /**
  * <code>AnimationClip</code> 类用于动画片段资源。
@@ -31,17 +30,19 @@ export class AnimationClip extends Resource {
 
 	/**
 	 * @inheritDoc
+	 * @internal
 	 */
-	static _parse(data: any, propertyParams: any = null, constructParams: any[] = null): AnimationClip {
-		var clip: AnimationClip = new AnimationClip();
-		var reader: Byte = new Byte(data);
-		var version: string = reader.readUTFString();
+	static _parse(data: any): AnimationClip {
+		var clip = new AnimationClip();
+		var reader = new Byte(data);
+		var version = reader.readUTFString();
 		switch (version) {
 			case "LAYAANIMATION:03":
 				AnimationClipParser03.parse(clip, reader);
 				break;
 			case "LAYAANIMATION:04":
 			case "LAYAANIMATION:COMPRESSION_04":
+			case "LAYAANIMATION:WEIGHT_04":
 				AnimationClipParser04.parse(clip, reader, version);
 				break;
 			default:
@@ -53,18 +54,18 @@ export class AnimationClip extends Resource {
 	/**
 	 * 加载动画片段。
 	 * @param url 动画片段地址。
-	 * @param complete  完成回掉。
+	 * @param complete  完成回掉。load
 	 */
 	static load(url: string, complete: Handler): void {
 		ILaya.loader.create(url, complete, null, AnimationClip.ANIMATIONCLIP);
 	}
 
 	/**@internal */
-	_duration: number;
+	_duration: number = 0;
 	/**@internal */
-	_frameRate: number;
+	_frameRate: number = 0;
 	/**@internal */
-	_nodes: KeyframeNodeList = new KeyframeNodeList();
+	_nodes: KeyframeNodeList | null = new KeyframeNodeList();
 	/**@internal */
 	_nodesDic: any;
 	/**@internal */
@@ -73,10 +74,11 @@ export class AnimationClip extends Resource {
 	_animationEvents: AnimationEvent[];
 
 	/**是否循环。*/
-	islooping: boolean;
+	islooping: boolean = false;
 
 	/**
-	 * 获取动画片段时长。
+	 * 动画持续时间
+	 * @returns 返回动画持续时间
 	 */
 	duration(): number {
 		return this._duration;
@@ -91,17 +93,29 @@ export class AnimationClip extends Resource {
 	}
 
 	/**
+	 * 是否是Weight模式
+	 * @param weightMode 
+	 * @param nextweightMode 
+	 * @returns true 此段动画插值使用埃尔米特插值
+	 */
+	private _weightModeHermite(weightMode: number, nextweightMode: number): boolean {
+		return (((weightMode & WeightedMode.Out) == 0) && ((nextweightMode & WeightedMode.In) == 0));
+	}
+
+
+
+	/**
 	 * @internal
 	 */
 	private _hermiteInterpolate(frame: FloatKeyframe, nextFrame: FloatKeyframe, t: number, dur: number): number {
-		var t0: number = frame.outTangent, t1: number = nextFrame.inTangent;
+		var t0 = frame.outTangent, t1 = nextFrame.inTangent;
 		if (Number.isFinite(t0) && Number.isFinite(t1)) {
-			var t2: number = t * t;
-			var t3: number = t2 * t;
-			var a: number = 2.0 * t3 - 3.0 * t2 + 1.0;
-			var b: number = t3 - 2.0 * t2 + t;
-			var c: number = t3 - t2;
-			var d: number = -2.0 * t3 + 3.0 * t2;
+			var t2 = t * t;
+			var t3 = t2 * t;
+			var a = 2.0 * t3 - 3.0 * t2 + 1.0;
+			var b = t3 - 2.0 * t2 + t;
+			var c = t3 - t2;
+			var d = -2.0 * t3 + 3.0 * t2;
 			return a * frame.value + b * t0 * dur + c * t1 * dur + d * nextFrame.value;
 		} else
 			return frame.value;
@@ -111,90 +125,200 @@ export class AnimationClip extends Resource {
 	 * @internal
 	 */
 	private _hermiteInterpolateVector3(frame: Vector3Keyframe, nextFrame: Vector3Keyframe, t: number, dur: number, out: Vector3): void {
-		var p0: Vector3 = frame.value;
-		var tan0: Vector3 = frame.outTangent;
-		var p1: Vector3 = nextFrame.value;
-		var tan1: Vector3 = nextFrame.inTangent;
+		var p0 = frame.value;
+		var tan0 = frame.outTangent;
+		var p1 = nextFrame.value;
+		var tan1 = nextFrame.inTangent;
 
-		var t2: number = t * t;
-		var t3: number = t2 * t;
-		var a: number = 2.0 * t3 - 3.0 * t2 + 1.0;
-		var b: number = t3 - 2.0 * t2 + t;
-		var c: number = t3 - t2;
-		var d: number = -2.0 * t3 + 3.0 * t2;
+		var t2 = t * t;
+		var t3 = t2 * t;
+		var a = 2.0 * t3 - 3.0 * t2 + 1.0;
+		var b = t3 - 2.0 * t2 + t;
+		var c = t3 - t2;
+		var d = -2.0 * t3 + 3.0 * t2;
 
-		var t0: number = tan0.x, t1: number = tan1.x;
-		if (Number.isFinite(t0) && Number.isFinite(t1))
-			out.x = a * p0.x + b * t0 * dur + c * t1 * dur + d * p1.x;
-		else
-			out.x = p0.x;
+		var t0 = tan0.x, t1 = tan1.x;
+		if (this._weightModeHermite(frame.weightedMode.x, nextFrame.weightedMode.x)) {
+			if (Number.isFinite(t0) && Number.isFinite(t1))
+				out.x = a * p0.x + b * t0 * dur + c * t1 * dur + d * p1.x;
+			else
+				out.x = p0.x;
+		} else {
+			out.x = this._hermiteCurveSplineWeight(frame.value.x, frame.time, frame.outWeight.x, frame.outTangent.x,
+				nextFrame.value.x, nextFrame.time, nextFrame.inWeight.x, nextFrame.inTangent.x, t);
+		}
 
 		t0 = tan0.y, t1 = tan1.y;
-		if (Number.isFinite(t0) && Number.isFinite(t1))
-			out.y = a * p0.y + b * t0 * dur + c * t1 * dur + d * p1.y;
-		else
-			out.y = p0.y;
+		if (this._weightModeHermite(frame.weightedMode.y, nextFrame.weightedMode.y)) {
+			if (Number.isFinite(t0) && Number.isFinite(t1))
+				out.y = a * p0.y + b * t0 * dur + c * t1 * dur + d * p1.y;
+			else
+				out.y = p0.y;
+		} else {
+			out.y = this._hermiteCurveSplineWeight(frame.value.y, frame.time, frame.outWeight.y, frame.outTangent.y,
+				nextFrame.value.y, nextFrame.time, nextFrame.inWeight.y, nextFrame.inTangent.y, t);
+		}
 
 		t0 = tan0.z, t1 = tan1.z;
-		if (Number.isFinite(t0) && Number.isFinite(t1))
-			out.z = a * p0.z + b * t0 * dur + c * t1 * dur + d * p1.z;
-		else
-			out.z = p0.z;
+		if (this._weightModeHermite(frame.weightedMode.z, nextFrame.weightedMode.z)) {
+			if (Number.isFinite(t0) && Number.isFinite(t1))
+				out.z = a * p0.z + b * t0 * dur + c * t1 * dur + d * p1.z;
+			else
+				out.z = p0.z;
+		} else {
+			out.z = this._hermiteCurveSplineWeight(frame.value.z, frame.time, frame.outWeight.z, frame.outTangent.z,
+				nextFrame.value.z, nextFrame.time, nextFrame.inWeight.z, nextFrame.inTangent.z, t);
+		}
 	}
 
 	/**
 	 * @internal
 	 */
 	private _hermiteInterpolateQuaternion(frame: QuaternionKeyframe, nextFrame: QuaternionKeyframe, t: number, dur: number, out: Quaternion): void {
-		var p0: Quaternion = frame.value;
-		var tan0: Vector4 = frame.outTangent;
-		var p1: Quaternion = nextFrame.value;
-		var tan1: Vector4 = nextFrame.inTangent;
+		var p0 = frame.value;
+		var tan0 = frame.outTangent;
+		var p1 = nextFrame.value;
+		var tan1 = nextFrame.inTangent;
 
-		var t2: number = t * t;
-		var t3: number = t2 * t;
-		var a: number = 2.0 * t3 - 3.0 * t2 + 1.0;
-		var b: number = t3 - 2.0 * t2 + t;
-		var c: number = t3 - t2;
-		var d: number = -2.0 * t3 + 3.0 * t2;
+		var t2 = t * t;
+		var t3 = t2 * t;
+		var a = 2.0 * t3 - 3.0 * t2 + 1.0;
+		var b = t3 - 2.0 * t2 + t;
+		var c = t3 - t2;
+		var d = -2.0 * t3 + 3.0 * t2;
 
-		var t0: number = tan0.x, t1: number = tan1.x;
-		if (Number.isFinite(t0) && Number.isFinite(t1))
-			out.x = a * p0.x + b * t0 * dur + c * t1 * dur + d * p1.x;
-		else
-			out.x = p0.x;
+		var t0 = tan0.x, t1 = tan1.x;
+		if (this._weightModeHermite(frame.weightedMode.x, nextFrame.weightedMode.x)) {
+			if (Number.isFinite(t0) && Number.isFinite(t1))
+				out.x = a * p0.x + b * t0 * dur + c * t1 * dur + d * p1.x;
+			else
+				out.x = p0.x;
+		} else {
+			out.x = this._hermiteCurveSplineWeight(frame.value.x, frame.time, frame.outWeight.x, frame.outTangent.x,
+				nextFrame.value.x, nextFrame.time, nextFrame.inWeight.x, nextFrame.inTangent.x, t);
+		}
+
 
 		t0 = tan0.y, t1 = tan1.y;
-		if (Number.isFinite(t0) && Number.isFinite(t1))
-			out.y = a * p0.y + b * t0 * dur + c * t1 * dur + d * p1.y;
-		else
-			out.y = p0.y;
+		if (this._weightModeHermite(frame.weightedMode.y, nextFrame.weightedMode.y)) {
+			if (Number.isFinite(t0) && Number.isFinite(t1))
+				out.y = a * p0.y + b * t0 * dur + c * t1 * dur + d * p1.y;
+			else
+				out.y = p0.y;
+		} else {
+			out.y = this._hermiteCurveSplineWeight(frame.value.y, frame.time, frame.outWeight.y, frame.outTangent.y,
+				nextFrame.value.y, nextFrame.time, nextFrame.inWeight.y, nextFrame.inTangent.y, t);
+		}
 
 		t0 = tan0.z, t1 = tan1.z;
-		if (Number.isFinite(t0) && Number.isFinite(t1))
-			out.z = a * p0.z + b * t0 * dur + c * t1 * dur + d * p1.z;
-		else
-			out.z = p0.z;
+		if (this._weightModeHermite(frame.weightedMode.z, nextFrame.weightedMode.z)) {
+			if (Number.isFinite(t0) && Number.isFinite(t1))
+				out.z = a * p0.z + b * t0 * dur + c * t1 * dur + d * p1.z;
+			else
+				out.z = p0.z;
+		} else {
+			out.z = this._hermiteCurveSplineWeight(frame.value.z, frame.time, frame.outWeight.z, frame.outTangent.z,
+				nextFrame.value.z, nextFrame.time, nextFrame.inWeight.z, nextFrame.inTangent.z, t);
+		}
 
 		t0 = tan0.w, t1 = tan1.w;
-		if (Number.isFinite(t0) && Number.isFinite(t1))
-			out.w = a * p0.w + b * t0 * dur + c * t1 * dur + d * p1.w;
-		else
-			out.w = p0.w;
+		if (this._weightModeHermite(frame.weightedMode.w, nextFrame.weightedMode.w)) {
+			if (Number.isFinite(t0) && Number.isFinite(t1))
+				out.w = a * p0.w + b * t0 * dur + c * t1 * dur + d * p1.w;
+			else
+				out.w = p0.w;
+		} else {
+			out.w = this._hermiteCurveSplineWeight(frame.value.w, frame.time, frame.outWeight.w, frame.outTangent.w,
+				nextFrame.value.w, nextFrame.time, nextFrame.inWeight.w, nextFrame.inTangent.w, t);
+		}
+	}
+
+	private _hermiteCurveSplineWeight(frameValue: number, frametime: number, frameOutWeight: number, frameOutTangent: number, nextframeValue: number, nextframetime: number, nextframeInweight: number, nextframeIntangent: number, time: number) {
+		let Eps = 2.22e-16;
+
+		let x = time;
+		let x1 = frametime;
+		let y1 = frameValue;
+		let wt1 = frameOutWeight;
+		let x2 = nextframetime;
+		let y2 = nextframeValue;
+		let wt2 = nextframeInweight;
+
+		let dx = x2 - x1;
+		let dy = y2 - y1;
+		dy = Math.max(Math.abs(dy), Eps) * (dy < 0 ? -1 : 1);
+
+		let yp1 = frameOutTangent;
+		let yp2 = nextframeIntangent;
+
+		if (!Number.isFinite(yp1) || !Number.isFinite(yp2)) {
+			return frameValue;
+		}
+
+		yp1 = yp1 * dx / dy;
+		yp2 = yp2 * dx / dy;
+
+		let wt2s = 1 - wt2;
+
+		let t = 0.5;
+		let t2 = 0;
+
+		if (Math.abs(wt1 - 0.33333334) < 0.0001 && Math.abs(wt2 - 0.33333334) < 0.0001) {
+			t = x;
+			t2 = 1 - t;
+		}
+		else {
+			while (true) {
+				t2 = (1 - t);
+				let fg = 3 * t2 * t2 * t * wt1 + 3 * t2 * t * t * wt2s + t * t * t - x;
+				if (Math.abs(fg) <= 2.5 * Eps)
+					break;
+
+				// third order householder method
+				let fpg = 3 * t2 * t2 * wt1 + 6 * t2 * t * (wt2s - wt1) + 3 * t * t * (1 - wt2s);
+				let fppg = 6 * t2 * (wt2s - 2 * wt1) + 6 * t * (1 - 2 * wt2s + wt1);
+				let fpppg = 18 * wt1 - 18 * wt2s + 6;
+
+				t -= (6 * fg * fpg * fpg - 3 * fg * fg * fppg) / (6 * fpg * fpg * fpg - 6 * fg * fpg * fppg + fg * fg * fpppg);
+			}
+		}
+
+		let y = 3 * t2 * t2 * t * wt1 * yp1 + 3 * t2 * t * t * (1 - wt2 * yp2) + t * t * t;
+
+		return y * dy + y1;
+	}
+
+	private _curveInterpolate(frame: FloatKeyframe, nextFrame: FloatKeyframe, t: number, dur: number): number {
+		if (this._weightModeHermite(frame.weightedMode, nextFrame.weightedMode)) {
+			return this._hermiteInterpolate(frame, nextFrame, t, dur);
+		} else {
+			//weight
+			return this._hermiteCurveSplineWeight(frame.value, frame.time, frame.outWeight, frame.outTangent,
+				nextFrame.value, nextFrame.time, nextFrame.inWeight, nextFrame.inTangent, t);
+		}
+
 	}
 
 	/**
 	 * @internal
+	 * @param nodes 动画帧
+	 * @param playCurTime 现在的播放时间
+	 * @param realTimeCurrentFrameIndexes 目前到达了动画的第几帧
+	 * @param addtive 是否是addtive模式
+	 * @param frontPlay 是否是前向播放
+	 * @param outDatas 计算好的动画数据
 	 */
-	_evaluateClipDatasRealTime(nodes: KeyframeNodeList, playCurTime: number, realTimeCurrentFrameIndexes: Int16Array, addtive: boolean, frontPlay: boolean, outDatas: Array<number | Vector3 | Quaternion | ConchVector3 | ConchQuaternion>): void {
-		for (var i: number = 0, n: number = nodes.count; i < n; i++) {
-			var node: KeyframeNode = nodes.getNodeByIndex(i);
-			var type: number = node.type;
-			var nextFrameIndex: number;
-			var keyFrames: Keyframe[] = node._keyFrames;
-			var keyFramesCount: number = keyFrames.length;
-			var frameIndex: number = realTimeCurrentFrameIndexes[i];
-
+	_evaluateClipDatasRealTime(nodes: KeyframeNodeList, playCurTime: number, realTimeCurrentFrameIndexes: Int16Array, addtive: boolean, frontPlay: boolean, outDatas: Array<number | Vector3 | Quaternion | ConchVector3 | ConchQuaternion>, avatarMask: AvatarMask): void {
+		for (var i = 0, n = nodes.count; i < n; i++) {
+			var node = nodes.getNodeByIndex(i);
+			var type = node.type;
+			var nextFrameIndex;
+			var keyFrames = node._keyFrames;
+			var keyFramesCount = keyFrames.length;
+			var frameIndex = realTimeCurrentFrameIndexes[i];
+			if (avatarMask && (!avatarMask.getTransformActive(node.nodePath))) {
+				continue;
+			}
 			if (frontPlay) {
 				if ((frameIndex !== -1) && (playCurTime < keyFrames[frameIndex].time)) {//重置正向循环
 					frameIndex = -1;
@@ -226,22 +350,22 @@ export class AnimationClip extends Resource {
 				}
 			}
 
-			var isEnd: boolean = nextFrameIndex === keyFramesCount;
+			var isEnd = nextFrameIndex === keyFramesCount;
 			switch (type) {
 				case 0:
 					if (frameIndex !== -1) {
-						var frame: FloatKeyframe = (<FloatKeyframe>keyFrames[frameIndex]);
+						var frame = (<FloatKeyframe>keyFrames[frameIndex]);
 						if (isEnd) {//如果nextFarme为空，不修改数据，保持上一帧
 							outDatas[i] = frame.value;
 						} else {
-							var nextFarme: FloatKeyframe = (<FloatKeyframe>keyFrames[nextFrameIndex]);
-							var d: number = nextFarme.time - frame.time;
-							var t: number;
+							var nextFarme = (<FloatKeyframe>keyFrames[nextFrameIndex]);
+							var d = nextFarme.time - frame.time;
+							var t;
 							if (d !== 0)
 								t = (playCurTime - frame.time) / d;
 							else
 								t = 0;
-							outDatas[i] = this._hermiteInterpolate(frame, nextFarme, t, d);
+							outDatas[i] = this._curveInterpolate(frame, nextFarme, t, d);
 						}
 
 					} else {
@@ -253,21 +377,21 @@ export class AnimationClip extends Resource {
 					break;
 				case 1:
 				case 4:
-					var clipData: Vector3 = <Vector3>outDatas[i];
+					var clipData = <Vector3>outDatas[i];
 					this._evaluateFrameNodeVector3DatasRealTime(keyFrames as Vector3Keyframe[], frameIndex, isEnd, playCurTime, clipData);
 					if (addtive) {
-						var firstFrameValue: Vector3 = ((<Vector3Keyframe>keyFrames[0])).value;
+						var firstFrameValue = ((<Vector3Keyframe>keyFrames[0])).value;
 						clipData.x -= firstFrameValue.x;
 						clipData.y -= firstFrameValue.y;
 						clipData.z -= firstFrameValue.z;
 					}
 					break;
 				case 2:
-					var clipQuat: Quaternion = <Quaternion>outDatas[i];
+					var clipQuat = <Quaternion>outDatas[i];
 					this._evaluateFrameNodeQuaternionDatasRealTime(keyFrames as QuaternionKeyframe[], frameIndex, isEnd, playCurTime, clipQuat);
 					if (addtive) {
-						var tempQuat: Quaternion = AnimationClip._tempQuaternion0;
-						var firstFrameValueQua: Quaternion = ((<QuaternionKeyframe>keyFrames[0])).value;
+						var tempQuat = AnimationClip._tempQuaternion0;
+						var firstFrameValueQua = ((<QuaternionKeyframe>keyFrames[0])).value;
 						Utils3D.quaternionConjugate(firstFrameValueQua, tempQuat);
 						Quaternion.multiply(tempQuat, clipQuat, clipQuat);
 					}
@@ -289,23 +413,31 @@ export class AnimationClip extends Resource {
 		}
 	}
 
+
+	/**
+	 * @internal
+	 * @param nodes 
+	 * @param playCurTime 
+	 * @param realTimeCurrentFrameIndexes 
+	 * @param addtive 
+	 */
 	_evaluateClipDatasRealTimeForNative(nodes: any, playCurTime: number, realTimeCurrentFrameIndexes: Uint16Array, addtive: boolean): void {
 		(<any>LayaGL.instance).evaluateClipDatasRealTime(nodes._nativeObj, playCurTime, realTimeCurrentFrameIndexes, addtive);
 	}
 
 	private _evaluateFrameNodeVector3DatasRealTime(keyFrames: Vector3Keyframe[], frameIndex: number, isEnd: boolean, playCurTime: number, outDatas: Vector3): void {
 		if (frameIndex !== -1) {
-			var frame: Vector3Keyframe = keyFrames[frameIndex];
+			var frame = keyFrames[frameIndex];
 			if (isEnd) {
-				var frameData: Vector3 = frame.value;
+				var frameData = frame.value;
 				outDatas.x = frameData.x;//不能设为null，会造成跳过当前帧数据
 				outDatas.y = frameData.y;
 				outDatas.z = frameData.z;
 			} else {
-				var nextKeyFrame: Vector3Keyframe = keyFrames[frameIndex + 1];
-				var t: number;
-				var startTime: number = frame.time;
-				var d: number = nextKeyFrame.time - startTime;
+				var nextKeyFrame = keyFrames[frameIndex + 1];
+				var t;
+				var startTime = frame.time;
+				var d = nextKeyFrame.time - startTime;
 				if (d !== 0)
 					t = (playCurTime - startTime) / d;
 				else
@@ -315,7 +447,7 @@ export class AnimationClip extends Resource {
 			}
 
 		} else {
-			var firstFrameDatas: Vector3 = keyFrames[0].value;
+			var firstFrameDatas = keyFrames[0].value;
 			outDatas.x = firstFrameDatas.x;
 			outDatas.y = firstFrameDatas.y;
 			outDatas.z = firstFrameDatas.z;
@@ -325,18 +457,18 @@ export class AnimationClip extends Resource {
 
 	private _evaluateFrameNodeQuaternionDatasRealTime(keyFrames: QuaternionKeyframe[], frameIndex: number, isEnd: boolean, playCurTime: number, outDatas: Quaternion): void {
 		if (frameIndex !== -1) {
-			var frame: QuaternionKeyframe = keyFrames[frameIndex];
+			var frame = keyFrames[frameIndex];
 			if (isEnd) {
-				var frameData: Quaternion = frame.value;
+				var frameData = frame.value;
 				outDatas.x = frameData.x;//不能设为null，会造成跳过当前帧数据
 				outDatas.y = frameData.y;
 				outDatas.z = frameData.z;
 				outDatas.w = frameData.w;
 			} else {
-				var nextKeyFrame: QuaternionKeyframe = keyFrames[frameIndex + 1];
-				var t: number;
-				var startTime: number = frame.time;
-				var d: number = nextKeyFrame.time - startTime;
+				var nextKeyFrame = keyFrames[frameIndex + 1];
+				var t;
+				var startTime = frame.time;
+				var d = nextKeyFrame.time - startTime;
 				if (d !== 0)
 					t = (playCurTime - startTime) / d;
 				else
@@ -346,7 +478,7 @@ export class AnimationClip extends Resource {
 			}
 
 		} else {
-			var firstFrameDatas: Quaternion = keyFrames[0].value;
+			var firstFrameDatas = keyFrames[0].value;
 			outDatas.x = firstFrameDatas.x;
 			outDatas.y = firstFrameDatas.y;
 			outDatas.z = firstFrameDatas.z;
@@ -355,12 +487,12 @@ export class AnimationClip extends Resource {
 	}
 
 	private _binarySearchEventIndex(time: number): number {
-		var start: number = 0;
-		var end: number = this._animationEvents.length - 1;
-		var mid: number;
+		var start = 0;
+		var end = this._animationEvents.length - 1;
+		var mid;
 		while (start <= end) {
 			mid = Math.floor((start + end) / 2);
-			var midValue: number = this._animationEvents[mid].time;
+			var midValue = this._animationEvents[mid].time;
 			if (midValue == time)
 				return mid;
 			else if (midValue > time)
@@ -373,9 +505,10 @@ export class AnimationClip extends Resource {
 
 	/**
 	 * 添加动画事件。
+	 * @param event 动画事件
 	 */
 	addEvent(event: AnimationEvent): void {
-		var index: number = this._binarySearchEventIndex(event.time);
+		var index = this._binarySearchEventIndex(event.time);
 		this._animationEvents.splice(index, 0, event);
 	}
 

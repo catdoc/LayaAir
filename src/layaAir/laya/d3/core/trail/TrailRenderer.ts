@@ -5,9 +5,6 @@ import { BaseRender } from "../render/BaseRender"
 import { RenderContext3D } from "../render/RenderContext3D"
 import { BoundFrustum } from "../../math/BoundFrustum"
 import { Matrix4x4 } from "../../math/Matrix4x4"
-import { Vector3 } from "../../math/Vector3"
-import { Render } from "../../../renders/Render"
-import { FrustumCulling } from "../../graphics/FrustumCulling"
 
 /**
  * <code>TrailRenderer</code> 类用于创建拖尾渲染器。
@@ -15,6 +12,7 @@ import { FrustumCulling } from "../../graphics/FrustumCulling"
 export class TrailRenderer extends BaseRender {
 	constructor(owner: TrailSprite3D) {
 		super(owner);
+		this._supportOctree = false;
 	}
 
 	/**

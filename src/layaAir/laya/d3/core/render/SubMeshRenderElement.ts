@@ -26,6 +26,12 @@ import { SingletonList } from "../../component/SingletonList";
  * @internal
  */
 export class SubMeshRenderElement extends RenderElement {
+
+	/**控制是否动态合并 */
+	static enableDynamicBatch:boolean = true;
+	/**是否静态合并 */
+	static enableStaticBatch:boolean = true;
+
 	/** @internal */
 	private _dynamicWorldPositionNormalNeedUpdate: boolean;
 
@@ -84,7 +90,7 @@ export class SubMeshRenderElement extends RenderElement {
 			var oriVertexes: Float32Array = vertexBuffer.getFloat32Data();
 			var worldMat: Matrix4x4 = this._transform.worldMatrix;
 			var rotation: Quaternion = this._transform.rotation;//TODO:是否换成矩阵
-			var indices: Uint16Array = subMesh._indices;
+			var indices = subMesh._indices;
 
 			for (var i: number = 0; i < vertexCount; i++) {
 				var index: number = multiSubMesh ? indices[i] : i;
@@ -145,7 +151,8 @@ export class SubMeshRenderElement extends RenderElement {
 		var subMeshStaticBatch: SubMeshStaticBatch = (<SubMeshStaticBatch>this.staticBatch);
 		var queueElements: SingletonList<RenderElement> = queue.elements;
 		var elements: any[] = queueElements.elements;
-		if (subMeshStaticBatch) {
+		//TODO:这里的还需要根据反射探针来修改一下合并相关
+		if (subMeshStaticBatch&&(!this.render._probReflection||this.render._probReflection._isScene)&&SubMeshRenderElement.enableStaticBatch) {
 			var staManager: MeshRenderStaticBatchManager = ILaya3D.MeshRenderStaticBatchManager.instance;
 			var staBatchMarks: BatchMark = staManager.getBatchOpaquaMark(this.render.lightmapIndex + 1, this.render.receiveShadow, this.material.id, subMeshStaticBatch._batchID);
 			if (staManager._updateCountMark === staBatchMarks.updateMark) {
@@ -177,7 +184,7 @@ export class SubMeshRenderElement extends RenderElement {
 				staBatchMarks.batched = false;//是否已有大于两个的元素可合并
 				queueElements.add(this);
 			}
-		} else if (this.renderSubShader._owner._enableInstancing && LayaGL.layaGPUInstance.supportInstance() && this.render.lightmapIndex < 0) {//需要支持Instance渲染才可用,暂不支持光照贴图
+		} else if (SubMeshRenderElement.enableDynamicBatch&&this.renderSubShader._owner._enableInstancing && LayaGL.layaGPUInstance.supportInstance() && this.render.lightmapIndex < 0 && (!this.render._probReflection||this.render._probReflection._isScene)) {//需要支持Instance渲染才可用,暂不支持光照贴图//不是Scene反射探针的不能合并TODO：这里需要重新判断
 			var subMesh: SubMesh = (<SubMesh>this._geometry);
 			var insManager: MeshRenderDynamicBatchManager = ILaya3D.MeshRenderDynamicBatchManager.instance;
 			var insBatchMarks: BatchMark = insManager.getInstanceBatchOpaquaMark(this.render.receiveShadow, this.material.id, subMesh._id, this._transform._isFrontFaceInvert);
@@ -185,7 +192,7 @@ export class SubMeshRenderElement extends RenderElement {
 				var insBatchIndex: number = insBatchMarks.indexInList;
 				if (insBatchMarks.batched) {
 					var instanceBatchElementList: SingletonList<SubMeshRenderElement> = elements[insBatchIndex].instanceBatchElementList;
-					if (instanceBatchElementList.length === SubMeshInstanceBatch.instance.maxInstanceCount) {
+					if (instanceBatchElementList.length === SubMeshInstanceBatch.maxInstanceCount) {
 						insBatchMarks.updateMark = insManager._updateCountMark;
 						insBatchMarks.indexInList = queueElements.length;
 						insBatchMarks.batched = false;//是否已有大于两个的元素可合并
@@ -217,7 +224,7 @@ export class SubMeshRenderElement extends RenderElement {
 				insBatchMarks.batched = false;//是否已有大于两个的元素可合并
 				queueElements.add(this);
 			}
-		} else if (this._dynamicVertexBatch) {
+		} else if (this._dynamicVertexBatch&&SubMeshRenderElement.enableDynamicBatch) {
 			var verDec: VertexDeclaration = ((<SubMesh>this._geometry))._vertexBuffer.vertexDeclaration;
 			var dynManager: MeshRenderDynamicBatchManager = ILaya3D.MeshRenderDynamicBatchManager.instance;
 			var dynBatchMarks: BatchMark = dynManager.getVertexBatchOpaquaMark(this.render.lightmapIndex + 1, this.render.receiveShadow, this.material.id, verDec.id);
@@ -262,7 +269,7 @@ export class SubMeshRenderElement extends RenderElement {
 		var subMeshStaticBatch: SubMeshStaticBatch = (<SubMeshStaticBatch>this.staticBatch);
 		var queueElements: SingletonList<RenderElement> = queue.elements;
 		var elements: any[] = queueElements.elements;
-		if (subMeshStaticBatch) {
+		if (subMeshStaticBatch&&SubMeshRenderElement.enableStaticBatch) {
 			var staManager: MeshRenderStaticBatchManager = ILaya3D.MeshRenderStaticBatchManager.instance;
 			var staLastElement: RenderElement = queue.lastTransparentRenderElement;
 			if (staLastElement) {
@@ -295,7 +302,7 @@ export class SubMeshRenderElement extends RenderElement {
 				queueElements.add(this);
 				queue.lastTransparentBatched = false;
 			}
-		} else if (this.renderSubShader._owner._enableInstancing && LayaGL.layaGPUInstance.supportInstance() && this.render.lightmapIndex < 0) {//需要支持Instance渲染才可用，暂不支持光照贴图
+		} else if (SubMeshRenderElement.enableDynamicBatch&&this.renderSubShader._owner._enableInstancing && LayaGL.layaGPUInstance.supportInstance() && this.render.lightmapIndex < 0 && (!this.render._probReflection||this.render._probReflection._isScene)) {//需要支持Instance渲染才可用，暂不支持光照贴图
 			var subMesh: SubMesh = (<SubMesh>this._geometry);
 			var insManager: MeshRenderDynamicBatchManager = ILaya3D.MeshRenderDynamicBatchManager.instance;
 			var insLastElement: RenderElement = queue.lastTransparentRenderElement;
@@ -307,7 +314,7 @@ export class SubMeshRenderElement extends RenderElement {
 				} else {
 					if (queue.lastTransparentBatched) {
 						var instanceBatchElementList: SingletonList<SubMeshRenderElement> = elements[queueElements.length - 1].instanceBatchElementList;
-						if (instanceBatchElementList.length === SubMeshInstanceBatch.instance.maxInstanceCount) {
+						if (instanceBatchElementList.length === SubMeshInstanceBatch.maxInstanceCount) {
 							queueElements.add(this);
 							queue.lastTransparentBatched = false;
 						} else {
@@ -336,13 +343,13 @@ export class SubMeshRenderElement extends RenderElement {
 				queue.lastTransparentBatched = false;
 			}
 
-		} else if (this._dynamicVertexBatch) {
+		} else if (this._dynamicVertexBatch&&SubMeshRenderElement.enableDynamicBatch) {
 			var verDec: VertexDeclaration = ((<SubMesh>this._geometry))._vertexBuffer.vertexDeclaration;
 			var dynManager: MeshRenderDynamicBatchManager = ILaya3D.MeshRenderDynamicBatchManager.instance;
 			var dynLastElement: RenderElement = queue.lastTransparentRenderElement;
 			if (dynLastElement) {
 				var dynLastRender: BaseRender = dynLastElement.render;
-				if (dynLastElement._geometry._getType() !== this._geometry._getType() || ((<SubMesh>dynLastElement._geometry))._vertexBuffer._vertexDeclaration !== verDec || dynLastElement.material !== this.material || dynLastRender.receiveShadow !== this.render.receiveShadow || dynLastRender.lightmapIndex !== this.render.lightmapIndex) {
+				if (!(dynLastElement as SubMeshRenderElement)._dynamicVertexBatch|| dynLastElement._geometry._getType() !== this._geometry._getType() || ((<SubMesh>dynLastElement._geometry))._vertexBuffer._vertexDeclaration !== verDec || dynLastElement.material !== this.material || dynLastRender.receiveShadow !== this.render.receiveShadow || dynLastRender.lightmapIndex !== this.render.lightmapIndex) {
 					queueElements.add(this);
 					queue.lastTransparentBatched = false;
 				} else {

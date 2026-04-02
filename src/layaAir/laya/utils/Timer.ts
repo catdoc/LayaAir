@@ -24,7 +24,7 @@ export class Timer {
     /**@internal */
     _lastTimer: number = Date.now();
     /**@private */
-    private _map: any[] = [];
+    private _map: {[key:string]:TimerHandler} = {};
     /**@private */
     private _handlers: any[] = [];
     /**@private */
@@ -110,7 +110,7 @@ export class Timer {
 
     /** @private */
     private _recoverHandler(handler: TimerHandler): void {
-        if (this._map[handler.key] == handler) this._map[handler.key] = null;
+        if (this._map[handler.key] == handler)delete this._map[handler.key];
         handler.clear();
         Timer._pool.push(handler);
     }
@@ -162,8 +162,8 @@ export class Timer {
         var caller: any = handler.caller;
         var method: any = handler.method;
         var cid: number = caller ? caller.$_GID || (caller.$_GID = ILaya.Utils.getGID()) : 0;
-        var mid: number = method.$_TID || (method.$_TID = (Timer._mid++) * 100000);
-        handler.key = cid + mid;
+        var mid: number = method.$_TID || (method.$_TID = Timer._mid++);
+        handler.key = cid + "_" + mid;
         this._map[handler.key] = handler;
     }
 
@@ -230,8 +230,6 @@ export class Timer {
     clear(caller: any, method: Function): void {
         var handler: TimerHandler = this._getHandler(caller, method);
         if (handler) {
-            this._map[handler.key] = null;
-            handler.key = 0;
             handler.clear();
         }
     }
@@ -245,8 +243,6 @@ export class Timer {
         for (var i: number = 0, n: number = this._handlers.length; i < n; i++) {
             var handler: TimerHandler = this._handlers[i];
             if (handler.caller === caller) {
-                this._map[handler.key] = null;
-                handler.key = 0;
                 handler.clear();
             }
         }
@@ -255,8 +251,9 @@ export class Timer {
     /** @private */
     private _getHandler(caller: any, method: any): TimerHandler {
         var cid: number = caller ? caller.$_GID || (caller.$_GID = ILaya.Utils.getGID()) : 0;
-        var mid: number = method.$_TID || (method.$_TID = (Timer._mid++) * 100000);
-        return this._map[cid + mid];
+        var mid: number = method.$_TID || (method.$_TID = Timer._mid++);
+        var key: any = cid + "_" + mid;
+        return this._map[key];
     }
 
     /**
@@ -310,7 +307,7 @@ export class Timer {
 
 /** @private */
 class TimerHandler {
-    key: number;
+    key: string;
     repeat: boolean;
     delay: number;
     userFrame: boolean;

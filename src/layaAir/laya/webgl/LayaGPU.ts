@@ -39,7 +39,13 @@ export class LayaGPU {
     /**@internal */
     _compressedTextureEtc1: any = null;
     /**@internal */
+    _compressedTextureETC:any = null;
+    /**@internal */
+    _compressedTextureASTC:any = null;
+    /**@internal */
     _webgl_depth_texture: any = null;
+    /**@internal webgl1.0开启OES_texture_half_float_linear会默认开启这个扩展*/
+    _extColorBufferFloat:any = null;
 
     /**
      * @internal
@@ -68,9 +74,8 @@ export class LayaGPU {
 
             SystemUtils._shaderCapailityLevel = 30;
         } else {
-            this._getExtension("EXT_color_buffer_float");
+            this._extColorBufferFloat = this._getExtension("EXT_color_buffer_float");
             //this._getExtension("OES_texture_float_linear");
-
             SystemUtils._shaderCapailityLevel = 35;
         }
 
@@ -79,7 +84,8 @@ export class LayaGPU {
         this._compressedTextureS3tc = this._getExtension("WEBGL_compressed_texture_s3tc");
         this._compressedTexturePvrtc = this._getExtension("WEBGL_compressed_texture_pvrtc");
         this._compressedTextureEtc1 = this._getExtension("WEBGL_compressed_texture_etc1");
-
+        this._compressedTextureETC = this._getExtension("WEBGL_compressed_texture_etc");
+        this._compressedTextureASTC = this._getExtension("WEBGL_compressed_texture_astc");
         SystemUtils._maxTextureCount = maxTextureFS;
         SystemUtils._maxTextureSize = maxTextureSize;
     }

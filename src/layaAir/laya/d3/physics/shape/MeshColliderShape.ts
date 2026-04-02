@@ -1,7 +1,7 @@
 import { Vector3 } from "../../math/Vector3";
 import { Mesh } from "../../resource/models/Mesh";
 import { ColliderShape } from "./ColliderShape";
-import { Physics3D } from "../Physics3D";
+import { ILaya3D } from "../../../../ILaya3D";
 
 /**
  * <code>MeshColliderShape</code> 类用于创建网格碰撞器。
@@ -12,6 +12,8 @@ export class MeshColliderShape extends ColliderShape {
 	/** @internal */
 	private _convex: boolean = false;
 
+	private _physicMesh:any;
+
 	/**
 	 * 网格。
 	 */
@@ -20,15 +22,15 @@ export class MeshColliderShape extends ColliderShape {
 	}
 
 	set mesh(value: Mesh) {
+		if(!value)
+			return;
 		if (this._mesh !== value) {
-			var bt: any = Physics3D._bullet;
+			var bt: any = ILaya3D.Physics3D._bullet;
+			this._physicMesh = value._getPhysicMesh()
 			if (this._mesh) {
-				bt.destroy(this._btShape);
+				bt.btCollisionShape_destroy(this._btShape);
 			}
-			if (value) {
-				this._btShape = bt.btGImpactMeshShape_create(value._getPhysicMesh());
-				bt.btGImpactShapeInterface_updateBound(this._btShape);
-			}
+			this._setPhysicsMesh();
 			this._mesh = value;
 		}
 	}
@@ -52,6 +54,34 @@ export class MeshColliderShape extends ColliderShape {
 
 
 	}
+	/**
+	 * @internal
+	 */
+	_setPhysicsMesh(){
+		if (this._attatchedCollisionObject) {
+			if(false){
+				this._createDynamicMeshCollider();
+			}else{
+				this._createBvhTriangleCollider();
+				//bt.btGImpactShapeInterface_updateBound(this._btShape);
+			}
+			
+		}
+	}
+
+	private _createDynamicMeshCollider(){
+		var bt: any = ILaya3D.Physics3D._bullet;
+		if(this._physicMesh){
+			this._btShape = bt.btGImpactMeshShape_create(this._physicMesh);
+			bt.btGImpactShapeInterface_updateBound(this._btShape);
+		}
+	}
+
+	private _createBvhTriangleCollider(){
+		var bt: any = ILaya3D.Physics3D._bullet;
+		if(this._physicMesh)
+		this._btShape = bt.btBvhTriangleMeshShape_create(this._physicMesh);
+	}
 
 	/**
 	 * @inheritDoc
@@ -62,10 +92,12 @@ export class MeshColliderShape extends ColliderShape {
 		if (this._compoundParent) {//TODO:待查,这里有问题
 			this.updateLocalTransformations();//TODO:
 		} else {
-			var bt: any = Physics3D._bullet;
+			var bt: any = ILaya3D.Physics3D._bullet;
 			bt.btVector3_setValue(ColliderShape._btScale, value.x, value.y, value.z);
 			bt.btCollisionShape_setLocalScaling(this._btShape, ColliderShape._btScale);
-			bt.btGImpactShapeInterface_updateBound(this._btShape);//更新缩放后需要更新包围体,有性能损耗
+			if(this._attatchedCollisionObject&&this._attatchedCollisionObject._enableProcessCollisions){
+				bt.btGImpactShapeInterface_updateBound(this._btShape);//更新缩放后需要更新包围体,有性能损耗
+			}
 		}
 	}
 
@@ -97,7 +129,7 @@ export class MeshColliderShape extends ColliderShape {
 	 */
 	destroy(): void {
 		if (this._btShape) {
-			Physics3D._bullet.btCollisionShape_destroy(this._btShape);
+			ILaya3D.Physics3D._bullet.btCollisionShape_destroy(this._btShape);
 			this._btShape = null;
 		}
 	}

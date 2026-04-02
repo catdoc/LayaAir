@@ -1,4 +1,5 @@
 import { Node } from "../../../display/Node";
+import { LayaGL } from "../../../layagl/LayaGL";
 import { Loader } from "../../../net/Loader";
 import { Color } from "../../math/Color";
 import { Vector2 } from "../../math/Vector2";
@@ -30,6 +31,7 @@ import { StartFrame } from "./module/StartFrame";
 import { TextureSheetAnimation } from "./module/TextureSheetAnimation";
 import { VelocityOverLifetime } from "./module/VelocityOverLifetime";
 import { ShuriKenParticle3DShaderDeclaration } from "./ShuriKenParticle3DShaderDeclaration";
+import { ShurikenParticleInstanceSystem } from "./ShurikenParticleInstanceSystem";
 import { ShurikenParticleMaterial } from "./ShurikenParticleMaterial";
 import { ShurikenParticleRenderer } from "./ShurikenParticleRenderer";
 import { ShurikenParticleSystem } from "./ShurikenParticleSystem";
@@ -48,12 +50,14 @@ export class ShuriKenParticle3D extends RenderableSprite3D {
 		ShuriKenParticle3DShaderDeclaration.SHADERDEFINE_RENDERMODE_HORIZONTALBILLBOARD = Shader3D.getDefineByName("HORIZONTALBILLBOARD");
 		ShuriKenParticle3DShaderDeclaration.SHADERDEFINE_RENDERMODE_VERTICALBILLBOARD = Shader3D.getDefineByName("VERTICALBILLBOARD");
 
+		ShuriKenParticle3DShaderDeclaration.SHADERDEFINE_COLORKEYCOUNT_8 = Shader3D.getDefineByName("COLORKEYCOUNT_8");
 		ShuriKenParticle3DShaderDeclaration.SHADERDEFINE_COLOROVERLIFETIME = Shader3D.getDefineByName("COLOROVERLIFETIME");
 		ShuriKenParticle3DShaderDeclaration.SHADERDEFINE_RANDOMCOLOROVERLIFETIME = Shader3D.getDefineByName("RANDOMCOLOROVERLIFETIME");
 		ShuriKenParticle3DShaderDeclaration.SHADERDEFINE_VELOCITYOVERLIFETIMECONSTANT = Shader3D.getDefineByName("VELOCITYOVERLIFETIMECONSTANT");
 		ShuriKenParticle3DShaderDeclaration.SHADERDEFINE_VELOCITYOVERLIFETIMECURVE = Shader3D.getDefineByName("VELOCITYOVERLIFETIMECURVE");
 		ShuriKenParticle3DShaderDeclaration.SHADERDEFINE_VELOCITYOVERLIFETIMERANDOMCONSTANT = Shader3D.getDefineByName("VELOCITYOVERLIFETIMERANDOMCONSTANT");
 		ShuriKenParticle3DShaderDeclaration.SHADERDEFINE_VELOCITYOVERLIFETIMERANDOMCURVE = Shader3D.getDefineByName("VELOCITYOVERLIFETIMERANDOMCURVE");
+
 		ShuriKenParticle3DShaderDeclaration.SHADERDEFINE_TEXTURESHEETANIMATIONCURVE = Shader3D.getDefineByName("TEXTURESHEETANIMATIONCURVE");
 		ShuriKenParticle3DShaderDeclaration.SHADERDEFINE_TEXTURESHEETANIMATIONRANDOMCURVE = Shader3D.getDefineByName("TEXTURESHEETANIMATIONRANDOMCURVE");
 		ShuriKenParticle3DShaderDeclaration.SHADERDEFINE_ROTATIONOVERLIFETIME = Shader3D.getDefineByName("ROTATIONOVERLIFETIME");
@@ -93,8 +97,12 @@ export class ShuriKenParticle3D extends RenderableSprite3D {
 	constructor() {
 		super(null);
 		this._render = new ShurikenParticleRenderer(this);
+		if (!LayaGL.layaGPUInstance.supportInstance()) {
+			this._particleSystem = new ShurikenParticleSystem(this);
+		} else
+			this._particleSystem = new ShurikenParticleInstanceSystem(this);
 
-		this._particleSystem = new ShurikenParticleSystem(this);
+
 
 		var elements: RenderElement[] = this._render._renderElements;
 		var element: RenderElement = elements[0] = new RenderElement();
@@ -111,12 +119,12 @@ export class ShuriKenParticle3D extends RenderableSprite3D {
 		for (var t in moduleData) {
 			switch (t) {
 				case "bases":
-					var bases: object = moduleData.bases;
+					var bases = moduleData.bases;
 					for (var k in bases)
 						module[k] = bases[k];
 					break;
 				case "vector2s":
-					var vector2s: object = moduleData.vector2s;
+					var vector2s = moduleData.vector2s;
 					for (var k in vector2s) {
 						var vec2: Vector2 = module[k];
 						var vec2Data: number[] = vector2s[k];
@@ -125,7 +133,7 @@ export class ShuriKenParticle3D extends RenderableSprite3D {
 					}
 					break;
 				case "vector3s":
-					var vector3s: object = moduleData.vector3s;
+					var vector3s = moduleData.vector3s;
 					for (var k in vector3s) {
 						var vec3: Vector3 = module[k];
 						var vec3Data: number[] = vector3s[k];
@@ -134,7 +142,7 @@ export class ShuriKenParticle3D extends RenderableSprite3D {
 					}
 					break;
 				case "vector4s":
-					var vector4s: object = moduleData.vector4s;
+					var vector4s = moduleData.vector4s;
 					for (var k in vector4s) {
 						var vec4: Vector4 = module[k];
 						var vec4Data: number[] = vector4s[k];
@@ -293,8 +301,10 @@ export class ShuriKenParticle3D extends RenderableSprite3D {
 
 			//ColorOverLifetime
 			var colorOverLifetimeData: any = data.colorOverLifetime;
+
 			if (colorOverLifetimeData) {
 				var colorData: any = colorOverLifetimeData.color;
+				let maxKeyCount = colorData.maxKeyCount;
 				var color: GradientColor;
 				switch (colorData.type) {
 					case 0:
@@ -302,7 +312,7 @@ export class ShuriKenParticle3D extends RenderableSprite3D {
 						color = GradientColor.createByConstant(constColorData ? new Vector4(constColorData[0], constColorData[1], constColorData[2], constColorData[3]) : new Vector4(0, 0, 0, 0));
 						break;
 					case 1:
-						color = GradientColor.createByGradient(this._initParticleColor(colorData.gradient));
+						color = GradientColor.createByGradient(this._initParticleColor(colorData.gradient, maxKeyCount));
 						break;
 					case 2:
 						var minConstColorData: any[] = colorData.constantMin;
@@ -310,7 +320,7 @@ export class ShuriKenParticle3D extends RenderableSprite3D {
 						color = GradientColor.createByRandomTwoConstant(minConstColorData ? new Vector4(minConstColorData[0], minConstColorData[1], minConstColorData[2], minConstColorData[3]) : new Vector4(0, 0, 0, 0), minConstColorData ? new Vector4(maxConstColorData[0], maxConstColorData[1], maxConstColorData[2], maxConstColorData[3]) : new Vector4(0, 0, 0, 0));
 						break;
 					case 3:
-						color = GradientColor.createByRandomTwoGradient(this._initParticleColor(colorData.gradientMin), this._initParticleColor(colorData.gradientMax));
+						color = GradientColor.createByRandomTwoGradient(this._initParticleColor(colorData.gradientMin, maxKeyCount), this._initParticleColor(colorData.gradientMax, maxKeyCount));
 						break;
 				}
 				var colorOverLifetime: ColorOverLifetime = new ColorOverLifetime(color);
@@ -548,6 +558,8 @@ export class ShuriKenParticle3D extends RenderableSprite3D {
 		particleSystem.startSpeedConstant = data.startSpeedConstant;
 		particleSystem.startSpeedConstantMin = data.startSpeedConstantMin;
 		particleSystem.startSpeedConstantMax = data.startSpeedConstantMax;
+
+		//parse Drag TODO:
 
 		particleSystem.threeDStartSize = data.threeDStartSize;
 		particleSystem.startSizeType = data.startSizeType;
@@ -883,8 +895,8 @@ export class ShuriKenParticle3D extends RenderableSprite3D {
 	 * @deprecated
 	 * @internal
 	 */
-	private _initParticleColor(gradientColorData: any): Gradient {
-		var gradientColor: Gradient = new Gradient(4, 4);
+	private _initParticleColor(gradientColorData: any, maxkeyCount: number = 4): Gradient {
+		var gradientColor: Gradient = new Gradient(maxkeyCount, maxkeyCount);
 		if (!gradientColorData) {
 			gradientColor.addColorAlpha(0, 1);
 			gradientColor.addColorAlpha(1, 1);
@@ -900,9 +912,9 @@ export class ShuriKenParticle3D extends RenderableSprite3D {
 			}
 			else {
 				for (i = 0, n = alphasData.length; i < n; i++) {
-					if (i == 3 && n > 4) {
+					if (i == maxkeyCount - 1 && n > maxkeyCount) {
 						i = n - 1;
-						console.warn("GradientDataColor warning:alpha data length is large than 4, will ignore the middle data.");
+						console.warn(`GradientDataColor warning:alpha data length is large than ${maxkeyCount}, will ignore the middle data.`);
 					}
 					var alphaData: any = alphasData[i];
 					gradientColor.addColorAlpha(alphaData.key, alphaData.value);
@@ -916,9 +928,9 @@ export class ShuriKenParticle3D extends RenderableSprite3D {
 			}
 			else {
 				for (i = 0, n = rgbsData.length; i < n; i++) {
-					if (i == 3 && n > 4) {
+					if (i == maxkeyCount - 1 && n > maxkeyCount) {
 						i = n - 1;
-						console.warn("GradientDataColor warning:rgb data length is large than 4, will ignore the middle data.");
+						console.warn(`GradientDataColor warning:rgb data length is large than ${maxkeyCount}, will ignore the middle data.`);
 					}
 					var rgbData: any = rgbsData[i];
 					var rgbValue: any[] = rgbData.value;

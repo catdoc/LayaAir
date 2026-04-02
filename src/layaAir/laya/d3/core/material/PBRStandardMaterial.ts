@@ -4,10 +4,13 @@ import PBRPS from "../../shader/files/PBR.fs";
 import PBRVS from "../../shader/files/PBR.vs";
 import PBRShadowCasterPS from "../../shader/files/PBRShadowCaster.fs";
 import PBRShadowCasterVS from "../../shader/files/PBRShadowCaster.vs";
+import DepthNormalsTextureVS from "../../shader/files/DepthNormalsTextureVS.vs";
+import DepthNormalsTextureFS from "../../shader/files/DepthNormalsTextureFS.fs";
 import { Shader3D } from "../../shader/Shader3D";
 import { ShaderDefine } from "../../shader/ShaderDefine";
 import { SubShader } from "../../shader/SubShader";
 import { PBRMaterial } from "./PBRMaterial";
+import { ShaderInit3D } from "../../shader/ShaderInit3D";
 
 /**
  * 金属度PBR材质光滑度数据源。
@@ -52,8 +55,9 @@ export class PBRStandardMaterial extends PBRMaterial {
 			'a_Texcoord1': VertexMesh.MESH_TEXTURECOORDINATE1,
 			'a_BoneWeights': VertexMesh.MESH_BLENDWEIGHT0,
 			'a_BoneIndices': VertexMesh.MESH_BLENDINDICES0,
-			'a_MvpMatrix': VertexMesh.MESH_MVPMATRIX_ROW0,
-			'a_WorldMat': VertexMesh.MESH_WORLDMATRIX_ROW0
+			'a_WorldMat': VertexMesh.MESH_WORLDMATRIX_ROW0,
+			'a_SimpleTextureParams':VertexMesh.MESH_SIMPLEANIMATOR
+
 		};
 		var uniformMap: any = {
 			'u_Bones': Shader3D.PERIOD_CUSTOM,
@@ -62,6 +66,17 @@ export class PBRStandardMaterial extends PBRMaterial {
 			'u_LightmapScaleOffset': Shader3D.PERIOD_SPRITE,
 			'u_LightMap': Shader3D.PERIOD_SPRITE,
 			'u_LightMapDirection': Shader3D.PERIOD_SPRITE,
+			
+			'u_SimpleAnimatorTexture':Shader3D.PERIOD_SPRITE,
+			'u_SimpleAnimatorParams':Shader3D.PERIOD_SPRITE,
+			'u_SimpleAnimatorTextureSize':Shader3D.PERIOD_SPRITE,
+			
+			//反射
+			'u_ReflectCubeHDRParams': Shader3D.PERIOD_SPRITE,
+			'u_ReflectTexture': Shader3D.PERIOD_SPRITE,
+			'u_SpecCubeProbePosition':Shader3D.PERIOD_SPRITE,
+			'u_SpecCubeBoxMax':Shader3D.PERIOD_SPRITE,
+			'u_SpecCubeBoxMin':Shader3D.PERIOD_SPRITE,
 
 			'u_CameraPos': Shader3D.PERIOD_CAMERA,
 			'u_View': Shader3D.PERIOD_CAMERA,
@@ -86,8 +101,7 @@ export class PBRStandardMaterial extends PBRMaterial {
 			'u_MetallicGlossTexture': Shader3D.PERIOD_MATERIAL,
 			'u_Metallic': Shader3D.PERIOD_MATERIAL,
 
-			'u_ReflectTexture': Shader3D.PERIOD_SCENE,
-			'u_ReflectIntensity': Shader3D.PERIOD_SCENE,
+
 			'u_AmbientColor': Shader3D.PERIOD_SCENE,
 			'u_FogStart': Shader3D.PERIOD_SCENE,
 			'u_FogRange': Shader3D.PERIOD_SCENE,
@@ -104,6 +118,10 @@ export class PBRStandardMaterial extends PBRMaterial {
 			'u_ShadowSplitSpheres': Shader3D.PERIOD_SCENE,
 			'u_ShadowMatrices': Shader3D.PERIOD_SCENE,
 			'u_ShadowMapSize': Shader3D.PERIOD_SCENE,
+			//SpotShadow
+			'u_SpotShadowMap':Shader3D.PERIOD_SCENE,
+			'u_SpotViewProjectMatrix':Shader3D.PERIOD_SCENE,
+			'u_ShadowLightPosition':Shader3D.PERIOD_SCENE,
 
 			//GI
 			'u_AmbientSHAr': Shader3D.PERIOD_SCENE,
@@ -113,8 +131,7 @@ export class PBRStandardMaterial extends PBRMaterial {
 			'u_AmbientSHBg': Shader3D.PERIOD_SCENE,
 			'u_AmbientSHBb': Shader3D.PERIOD_SCENE,
 			'u_AmbientSHC': Shader3D.PERIOD_SCENE,
-			'u_ReflectionProbe': Shader3D.PERIOD_SCENE,
-			'u_ReflectCubeHDRParams': Shader3D.PERIOD_SCENE,
+
 
 			//legacy lighting
 			'u_DirectionLight.direction': Shader3D.PERIOD_SCENE,
@@ -128,19 +145,13 @@ export class PBRStandardMaterial extends PBRMaterial {
 			'u_SpotLight.spot': Shader3D.PERIOD_SCENE,
 			'u_SpotLight.color': Shader3D.PERIOD_SCENE
 		};
-		var stateMap = {
-			's_Cull': Shader3D.RENDER_STATE_CULL,
-			's_Blend': Shader3D.RENDER_STATE_BLEND,
-			's_BlendSrc': Shader3D.RENDER_STATE_BLEND_SRC,
-			's_BlendDst': Shader3D.RENDER_STATE_BLEND_DST,
-			's_DepthTest': Shader3D.RENDER_STATE_DEPTH_TEST,
-			's_DepthWrite': Shader3D.RENDER_STATE_DEPTH_WRITE
-		}
-		var shader: Shader3D = Shader3D.add("PBR");
+		var stateMap = ShaderInit3D.stateMap;
+		var shader: Shader3D = Shader3D.add("PBR",attributeMap,uniformMap,true,true);
 		var subShader: SubShader = new SubShader(attributeMap, uniformMap);
 		shader.addSubShader(subShader);
 		subShader.addShaderPass(PBRVS, PBRPS, stateMap, "Forward");
 		subShader.addShaderPass(PBRShadowCasterVS, PBRShadowCasterPS, stateMap, "ShadowCaster");
+		subShader.addShaderPass(DepthNormalsTextureVS,DepthNormalsTextureFS,stateMap,"DepthNormal");
 	}
 
 	/** @internal */

@@ -4,6 +4,8 @@ import { Texture2D } from "./Texture2D";
 import { Context } from "./Context";
 import { ILaya } from "../../ILaya";
 import { Browser } from "../utils/Browser";
+import { RenderTexture2D } from "./RenderTexture2D";
+import { BaseTexture } from "./BaseTexture";
 
 
 /**
@@ -79,15 +81,16 @@ export class HTMLCanvas extends Bitmap {
      * Canvas 渲染上下文。
      */
     get context(): Context {
-		if (this._ctx) return this._ctx;
-		//@ts-ignore
+        if (this._ctx) return this._ctx;
+        //@ts-ignore
         if (this._source == this) {	//是webgl并且不是真的画布。如果是真的画布，可能真的想要2d context
+            // @ts-ignore
             this._ctx = new ILaya.Context();
         } else {
+            //@ts-ignore
             this._ctx = this._source.getContext(ILaya.Render.isConchApp ? 'layagl' : '2d');
         }
         this._ctx._canvas = this;
-        //if(!Browser.onLimixiu) _ctx.size = function(w:Number, h:Number):void {};	这个是干什么的，会导致ctx的size不好使
         return this._ctx;
     }
 
@@ -145,7 +148,7 @@ export class HTMLCanvas extends Bitmap {
     /**
      * 获取texture实例
      */
-    getTexture(): Texture {
+    getTexture(): Texture|null|RenderTexture2D {
         if (!this._texture) {
             var bitmap: Texture2D = new Texture2D();
             bitmap.loadImageSource(this.source);
@@ -159,7 +162,7 @@ export class HTMLCanvas extends Bitmap {
      * @param	type "image/png"
      * @param	encoderOptions	质量参数，取值范围为0-1
      */
-    toBase64(type: string, encoderOptions: number): string {
+    toBase64(type: string, encoderOptions: number): string|null {
         if (this._source) {
             if (ILaya.Render.isConchApp) {
                 var win: any = window as any;

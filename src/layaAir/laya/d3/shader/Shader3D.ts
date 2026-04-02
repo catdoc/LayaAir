@@ -1,11 +1,9 @@
-import { Config3D } from "../../../Config3D";
 import { ShaderCompile } from "../../webgl/utils/ShaderCompile";
 import { DefineDatas } from "./DefineDatas";
 import { ShaderDefine } from "./ShaderDefine";
 import { ShaderPass } from "./ShaderPass";
 import { ShaderVariant, ShaderVariantCollection } from "./ShaderVariantCollection";
 import { SubShader } from "./SubShader";
-import { LayaGL } from "../../layagl/LayaGL";
 
 /**
  * <code>Shader3D</code> 类用于创建Shader3D。
@@ -43,6 +41,15 @@ export class Shader3D {
 	static RENDER_STATE_DEPTH_TEST: number = 12;
 	/**渲染状态_深度写入。*/
 	static RENDER_STATE_DEPTH_WRITE: number = 13;
+	/**渲染状态_模板测试。*/
+	static RENDER_STATE_STENCIL_TEST:number = 14;
+	/**渲染状态_模板写入 */
+	static RENDER_STATE_STENCIL_WRITE:number = 15;
+	/**渲染状态_模板写入值 */
+	static RENDER_STATE_STENCIL_REF:number = 16;
+	/**渲染状态_模板写入设置 */
+	static RENDER_STATE_STENCIL_OP:number = 17;
+
 
 	/**shader变量提交周期，自定义。*/
 	static PERIOD_CUSTOM: number = 0;
@@ -61,20 +68,22 @@ export class Shader3D {
 	static SHADERDEFINE_GRAPHICS_API_GLES2: ShaderDefine;
 	/**@internal 图形API为WebGL2.0/OPENGLES3.0。*/
 	static SHADERDEFINE_GRAPHICS_API_GLES3: ShaderDefine;
+	
+	/**@internal */
+	static _propertyNameMap: any = {};
 
 	/**@internal */
 	private static _propertyNameCounter: number = 0;
-	/**@internal */
-	private static _propertyNameMap: any = {};
+	
 	/**@internal */
 	private static _defineCounter: number = 0;
 	/**@internal */
-	private static _defineMap: object = {};
+	private static _defineMap: {[key:string]:ShaderDefine} = {};
 
 	/**@internal */
 	static _preCompileShader: any = {};
 	/**@internal */
-	static _maskMap: Array<object> = [];
+	static _maskMap:Array<{[key:number]:string}> = [];
 	/**@internal */
 	static _debugShaderVariantInfo: ShaderVariant;
 
@@ -94,11 +103,11 @@ export class Shader3D {
 	 * @internal
 	 */
 	static _getNamesByDefineData(defineData: DefineDatas, out: Array<string>): void {
-		var maskMap: object[] = Shader3D._maskMap;
+		var maskMap:Array<{[key:number]:string}> = Shader3D._maskMap;
 		var mask: Array<number> = defineData._mask;
 		out.length = 0;
 		for (var i: number = 0, n: number = defineData._length; i < n; i++) {
-			var subMaskMap: object = maskMap[i];
+			var subMaskMap:{[key:number]:string} = maskMap[i];
 			var subMask: number = mask[i];
 			for (var j: number = 0; j < 32; j++) {
 				var d: number = 1 << j;
@@ -117,7 +126,7 @@ export class Shader3D {
 	static getDefineByName(name: string): ShaderDefine {
 		var define: ShaderDefine = Shader3D._defineMap[name];
 		if (!define) {
-			var maskMap: Array<object> = Shader3D._maskMap;
+			var maskMap = Shader3D._maskMap;
 			var counter: number = Shader3D._defineCounter;
 			var index: number = Math.floor(counter / 32);
 			var value: number = 1 << counter % 32;
@@ -145,6 +154,7 @@ export class Shader3D {
 		} else {
 			var id: number = Shader3D._propertyNameCounter++;
 			Shader3D._propertyNameMap[name] = id;
+			Shader3D._propertyNameMap[id] = name;
 			return id;
 		}
 	}
@@ -193,8 +203,8 @@ export class Shader3D {
 	/**
 	 * 添加预编译shader文件，主要是处理宏定义
 	 */
-	static add(name: string, attributeMap: any = null, uniformMap: any = null, enableInstancing: boolean = false): Shader3D {
-		return Shader3D._preCompileShader[name] = new Shader3D(name, attributeMap, uniformMap, enableInstancing);
+	static add(name: string, attributeMap: any = null, uniformMap: any = null, enableInstancing: boolean = false,supportReflectionProbe:boolean = false): Shader3D {
+		return Shader3D._preCompileShader[name] = new Shader3D(name, attributeMap, uniformMap, enableInstancing,supportReflectionProbe);
 	}
 
 	/**
@@ -210,6 +220,8 @@ export class Shader3D {
 	_name: string;
 	/**@internal */
 	_enableInstancing: boolean = false;
+	/**@internal */
+	_supportReflectionProbe:boolean = false;
 
 	/**@internal */
 	_subShaders: SubShader[] = [];
@@ -224,11 +236,12 @@ export class Shader3D {
 	/**
 	 * 创建一个 <code>Shader3D</code> 实例。
 	 */
-	constructor(name: string, attributeMap: any, uniformMap: any, enableInstancing: boolean) {
+	constructor(name: string, attributeMap: any, uniformMap: any, enableInstancing: boolean, supportReflectionProbe:boolean) {
 		this._name = name;
 		this._attributeMap = attributeMap;
 		this._uniformMap = uniformMap;
 		this._enableInstancing = enableInstancing;
+		this._supportReflectionProbe = supportReflectionProbe;
 	}
 
 	/**
@@ -257,7 +270,7 @@ export class Shader3D {
 	 * @param   passIndex  通道索引。
 	 * @param	defineMask 宏定义遮罩集合。
 	 */
-	static compileShader(shaderName: string, subShaderIndex: number, passIndex: number, ...defineMask): void {
+	static compileShader(shaderName: string, subShaderIndex: number, passIndex: number, ...defineMask:any[]): void {
 		var shader: Shader3D = Shader3D.find(shaderName);
 		if (shader) {
 			var subShader: SubShader = shader.getSubShaderAt(subShaderIndex);

@@ -274,7 +274,20 @@ export class Quaternion implements IClone {
 	 * @param	z 四元数的z值
 	 * @param	w 四元数的w值
 	 */
-	constructor(x: number = 0, y: number = 0, z: number = 0, w: number = 1, nativeElements: Float32Array = null/*[NATIVE]*/) {
+	constructor(x: number = 0, y: number = 0, z: number = 0, w: number = 1) {
+		this.x = x;
+		this.y = y;
+		this.z = z;
+		this.w = w;
+	}
+
+	/**
+	 * 设置四元数的值。
+	 * @param	x X值。
+	 * @param	y Y值。
+	 * @param	z Z值。
+	 */
+	setValue(x: number, y: number, z: number, w: number): void {
 		this.x = x;
 		this.y = y;
 		this.z = z;

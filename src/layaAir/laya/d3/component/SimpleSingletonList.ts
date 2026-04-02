@@ -29,6 +29,7 @@ export class SimpleSingletonList extends SingletonList<ISingletonElement> {
 	 */
 	remove(element: ISingletonElement): void {
 		var index: number = element._getIndexInList();
+		if(index===-1) return;//TODO
 		this.length--;
 		if (index !== this.length) {
 			var end: any = this.elements[this.length];
@@ -45,6 +46,11 @@ export class SimpleSingletonList extends SingletonList<ISingletonElement> {
 		var elements: ISingletonElement[] = this.elements;
 		for (var i: number = 0, n: number = this.length; i < n; i++)
 			elements[i]._setIndexInList(-1);
+		this.length = 0;
+	}
+
+	clearElement(){
+		this.elements=null;
 		this.length = 0;
 	}
 

@@ -280,7 +280,7 @@ export class Clip extends UIComponent {
      */
     protected changeClip(): void {
         this._clipChanged = false;
-        if (!this._skin) return;
+        if (!this._skin || this.destroyed) return;
         var img: any = Loader.getRes(this._skin);
         if (img) {
             this.loadComplete(this._skin, img);
@@ -480,10 +480,12 @@ export class Clip extends UIComponent {
      * @param	to		结束索引，-1为不限制
      */
     play(from: number = 0, to: number = -1): void {
+        this._setClipChanged();
         this._isPlaying = true;
         this.index = from;
         this._toIndex = to;
-        this._index++;
+        // this._index++;
+        //修复clip重复播放丢失帧的问题
         ILaya.timer.loop(this.interval, this, this._loop);
 
         this.on(Event.DISPLAY, this, this._onDisplay);

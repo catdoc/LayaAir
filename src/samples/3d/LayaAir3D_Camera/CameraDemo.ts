@@ -1,6 +1,5 @@
 import { Laya } from "Laya";
-import { BaseCamera } from "laya/d3/core/BaseCamera";
-import { Camera } from "laya/d3/core/Camera";
+import { Camera, CameraClearFlags } from "laya/d3/core/Camera";
 import { DirectionLight } from "laya/d3/core/light/DirectionLight";
 import { BlinnPhongMaterial } from "laya/d3/core/material/BlinnPhongMaterial";
 import { Material } from "laya/d3/core/material/Material";
@@ -20,7 +19,9 @@ import { Button } from "laya/ui/Button";
 import { Browser } from "laya/utils/Browser";
 import { Handler } from "laya/utils/Handler";
 import { Stat } from "laya/utils/Stat";
+import { Utils } from "laya/utils/Utils";
 import { Laya3D } from "Laya3D";
+import Client from "../../Client";
 import { CameraMoveScript } from "../common/CameraMoveScript";
 
 
@@ -37,6 +38,11 @@ export class CameraDemo {
 	private _rotation2: Vector3 = new Vector3(-3.14 / 3, 0, 0);
 	private _rotation3: Vector3 = new Vector3(0, 45, 0);
 	private _clearColor: Vector4 = new Vector4(0, 0.2, 0.6, 1);
+
+	/**实例类型*/
+	private btype:any = "CameraDemo";
+	/**场景内按钮类型*/
+	private stype:any = 0;
 
 	constructor() {
 		//初始化引擎
@@ -61,7 +67,7 @@ export class CameraDemo {
 		this.camera.transform.rotate(this._rotation, true, false);
 		this.camera.useOcclusionCulling = false;
 		//相机设置清楚标记,使用固定颜色
-		this.camera.clearFlag = BaseCamera.CLEARFLAG_SOLIDCOLOR;
+		this.camera.clearFlag = CameraClearFlags.SolidColor;
 		//使用默认颜色
 		//camera.clearColor = _clearColor;
 		//设置摄像机视野范围（角度）
@@ -107,18 +113,7 @@ export class CameraDemo {
 			changeActionButton.scale(Browser.pixelRatio, Browser.pixelRatio);
 			changeActionButton.pos(Laya.stage.width / 2 - changeActionButton.width * Browser.pixelRatio / 2 - 100, Laya.stage.height - 100 * Browser.pixelRatio);
 
-			changeActionButton.on(Event.CLICK, this, function (): void {
-				this.index++;
-				if (this.index % 2 === 1) {
-					//正交投影属性设置
-					this.camera.orthographic = true;
-					//正交垂直矩阵距离,控制3D物体远近与显示大小
-					this.camera.orthographicVerticalSize = 7;
-				} else {
-					//正交投影属性设置,关闭
-					this.camera.orthographic = false;
-				}
-			});
+			changeActionButton.on(Event.CLICK, this, this.stypeFun0);
 
 			var changeActionButton2: Button = (<Button>Laya.stage.addChild(new Button("res/threeDimen/ui/button.png", "切换背景")));
 			changeActionButton2.size(160, 40);
@@ -128,26 +123,44 @@ export class CameraDemo {
 			changeActionButton2.scale(Browser.pixelRatio, Browser.pixelRatio);
 			changeActionButton2.pos(Laya.stage.width / 2 - changeActionButton2.width * Browser.pixelRatio / 2 + 100, Laya.stage.height - 100 * Browser.pixelRatio);
 
-			changeActionButton2.on(Event.CLICK, this, function (): void {
-				this.index2++;
-				if (this.index2 % 2 === 1) {
-					//设置相机的清除标识为天空盒
-					this.camera.clearFlag = BaseCamera.CLEARFLAG_SKY;
-					//使用加载天空盒材质
-					var skyboxMaterial: Material = (<Material>Loader.getRes("res/threeDimen/skyBox/skyBox2/skyBox2.lmat"));
-					//获取相机的天空渲染器
-					var skyRenderer: SkyRenderer = this.camera.skyRenderer;
-					//设置相机的天空渲染器的mesh
-					skyRenderer.mesh = SkyBox.instance;
-					//设置相机的天空渲染器的material
-					skyRenderer.material = skyboxMaterial;
-				} else {
-					//设置相机的清除标识为为固定颜色
-					this.camera.clearFlag = BaseCamera.CLEARFLAG_SOLIDCOLOR;
-				}
-			});
-
+			changeActionButton2.on(Event.CLICK, this, this.stypeFun1);
 		}));
+	}
+
+	stypeFun0(index:number = 0) {
+		this.index++;
+		if (this.index % 2 === 1) {
+			//正交投影属性设置
+			this.camera.orthographic = true;
+			//正交垂直矩阵距离,控制3D物体远近与显示大小
+			this.camera.orthographicVerticalSize = 7;
+		} else {
+			//正交投影属性设置,关闭
+			this.camera.orthographic = false;
+		}
+		index = this.index;
+		Client.instance.send({type:"next",btype:this.btype,stype:0,value:index});
+	}
+
+	stypeFun1(index2:number = 0): void {
+		this.index2++;
+		if (this.index2 % 2 === 1) {
+			//设置相机的清除标识为天空盒
+			this.camera.clearFlag = CameraClearFlags.Sky;
+			//使用加载天空盒材质
+			var skyboxMaterial: Material = (<Material>Loader.getRes("res/threeDimen/skyBox/skyBox2/skyBox2.lmat"));
+			//获取相机的天空渲染器
+			var skyRenderer: SkyRenderer = this.camera.skyRenderer;
+			//设置相机的天空渲染器的mesh
+			skyRenderer.mesh = SkyBox.instance;
+			//设置相机的天空渲染器的material
+			skyRenderer.material = skyboxMaterial;
+		} else {
+			//设置相机的清除标识为为固定颜色
+			this.camera.clearFlag = CameraClearFlags.SolidColor;
+		}
+		index2 = this.index2;
+		Client.instance.send({type:"next",btype:this.btype,stype:1,value:index2});
 	}
 
 }

@@ -1,7 +1,7 @@
 /*
 	texture和fillrect使用的。
 */
-#ifdef GL_FRAGMENT_PRECISION_HIGH
+#if defined(GL_FRAGMENT_PRECISION_HIGH)// 原来的写法会被我们自己的解析流程处理，而我们的解析是不认内置宏的，导致被删掉，所以改成 if defined 了
 precision highp float;
 #else
 precision mediump float;
@@ -14,7 +14,7 @@ uniform sampler2D texture;
 varying vec2 cliped;
 
 #ifdef BLUR_FILTER
-uniform vec4 strength_sig2_2sig2_gauss1;
+uniform vec4 strength_sig2_2sig2_gauss1;//TODO模糊的过程中会导致变暗变亮  
 uniform vec2 blurInfo;
 
 #define PI 3.141593
@@ -40,6 +40,7 @@ vec4 blur(){
         }
         ctexcoord.y+=step.y;
     }
+    //vec4Color.w=1.0;  这个会导致丢失alpha。以后有时间再找模糊会导致透明的问题
     return vec4Color;
 }
 #endif

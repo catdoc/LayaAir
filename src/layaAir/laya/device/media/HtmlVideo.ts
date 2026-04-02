@@ -4,10 +4,10 @@ import { ILaya } from "../../../ILaya";
 
 
 /**
- * @internal
+ * <HtmlVideo>html多媒体数据<HtmlVideo>
  */
 export class HtmlVideo extends Bitmap {
-    protected video: HTMLVideoElement;
+    public video: HTMLVideoElement;
 	protected _source: any;
 	protected _w=0;
 	protected _h=0;
@@ -20,17 +20,23 @@ export class HtmlVideo extends Bitmap {
         this.createDomElement();
     }
 
+    /**
+     * 创建一个 HtmlVideo 实例
+     */
     static create: Function = function (): HtmlVideo {
         return new HtmlVideo();
     }
 
     private createDomElement(): void {
         this._source = this.video = ILaya.Browser.createElement("video");
-
+        // 默认放开webGL对纹理数据的跨域限制
+        this.video.setAttribute('crossorigin', 'Anonymous');
         var style: any = this.video.style;
         style.position = 'absolute';
         style.top = '0px';
         style.left = '0px';
+
+
 
         this.video.addEventListener("loadedmetadata", ()=> {
             this._w = this.video.videoWidth;
@@ -38,6 +44,11 @@ export class HtmlVideo extends Bitmap {
         });
     }
 
+    /**
+     * 设置播放源路径
+     * @param url 播放源路径
+     * @param extension 播放源类型(1: MP4, 2: OGG)
+     */
     setSource(url: string, extension: number): void {
         while (this.video.childElementCount)
             this.video.firstChild.remove();
@@ -55,10 +66,14 @@ export class HtmlVideo extends Bitmap {
         this.video.appendChild(sourceElement);
     }
 
+    /**
+     * 获取播放源
+     */
     getVideo(): any {
         return this.video;
     }
     /**
+     * 获取播放源
      * @internal
      * @override
      */
@@ -68,6 +83,7 @@ export class HtmlVideo extends Bitmap {
     }
 
     /**
+     * 销毁
      * @override
      */
     destroy(): void {

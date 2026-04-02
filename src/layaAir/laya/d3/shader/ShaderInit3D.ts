@@ -11,6 +11,7 @@ import extendTerrainVS from "./files/extendTerrain.vs";
 import GlobalIllumination from "./files/GlobalIllumination.glsl";
 import LightingGLSL from "./files/Lighting.glsl";
 import ShadowSampleTentGLSL from "./files/ShadowSampleTent.glsl";
+import LayaUtile from "./files/LayaUtile.glsl"
 import linePS from "./files/line.fs";
 import lineVS from "./files/line.vs";
 import MeshBlinnPhongPS from "./files/Mesh-BlinnPhong.fs";
@@ -49,9 +50,13 @@ import UnlitPS from "./files/Unlit.fs";
 import UnlitVS from "./files/Unlit.vs";
 import WaterPrimaryPS from "./files/WaterPrimary.fs";
 import WaterPrimaryVS from "./files/WaterPrimary.vs";
+import DepthNormalsTextureVS from "./files/DepthNormalsTextureVS.vs";
+import DepthNormalsTextureFS from "./files/DepthNormalsTextureFS.fs";
+import DepthNormalUtil from "./files/DepthNormalUtil.glsl";
 import { Shader3D } from "./Shader3D";
 import { ShaderPass } from "./ShaderPass";
 import { SubShader } from "./SubShader";
+
 
 
 
@@ -60,6 +65,7 @@ import { SubShader } from "./SubShader";
  * <code>ShaderInit</code> 类用于初始化内置Shader。
  */
 export class ShaderInit3D {
+	static stateMap:any;
 	/**
 	 * 创建一个 <code>ShaderInit</code> 实例。
 	 */
@@ -88,6 +94,21 @@ export class ShaderInit3D {
 		Shader3D.addInclude("LayaPBRBRDF.glsl", LayaPBRBRDF);
 		Shader3D.addInclude("PBRCore.glsl", PBRCore);
 		Shader3D.addInclude("PBRVertex.glsl", PBRVertex);
+		Shader3D.addInclude("LayaUtile.glsl",LayaUtile);
+		Shader3D.addInclude("DepthNormalUtil.glsl",DepthNormalUtil);
+		let stateMap = ShaderInit3D.stateMap = {
+			's_Cull': Shader3D.RENDER_STATE_CULL,
+			's_Blend': Shader3D.RENDER_STATE_BLEND,
+			's_BlendSrc': Shader3D.RENDER_STATE_BLEND_SRC,
+			's_BlendDst': Shader3D.RENDER_STATE_BLEND_DST,
+			's_DepthTest': Shader3D.RENDER_STATE_DEPTH_TEST,
+			's_DepthWrite': Shader3D.RENDER_STATE_DEPTH_WRITE,
+			's_StencilTest':Shader3D.RENDER_STATE_STENCIL_TEST,
+			's_StencilWrite':Shader3D.RENDER_STATE_STENCIL_WRITE,
+			's_StencilRef':Shader3D.RENDER_STATE_STENCIL_REF,
+			's_StencilOp':Shader3D.RENDER_STATE_STENCIL_OP
+			
+		}
 
 		//BLINNPHONG
 		var attributeMap: any = {
@@ -99,8 +120,8 @@ export class ShaderInit3D {
 			'a_BoneWeights': VertexMesh.MESH_BLENDWEIGHT0,
 			'a_BoneIndices': VertexMesh.MESH_BLENDINDICES0,
 			'a_Tangent0': VertexMesh.MESH_TANGENT0,
-			'a_MvpMatrix': VertexMesh.MESH_MVPMATRIX_ROW0,
-			'a_WorldMat': VertexMesh.MESH_WORLDMATRIX_ROW0
+			'a_WorldMat': VertexMesh.MESH_WORLDMATRIX_ROW0,
+			'a_SimpleTextureParams':VertexMesh.MESH_SIMPLEANIMATOR
 		};
 		var uniformMap: any = {
 			'u_Bones': Shader3D.PERIOD_CUSTOM,
@@ -109,15 +130,25 @@ export class ShaderInit3D {
 			'u_NormalTexture': Shader3D.PERIOD_MATERIAL,
 			'u_AlphaTestValue': Shader3D.PERIOD_MATERIAL,
 			'u_DiffuseColor': Shader3D.PERIOD_MATERIAL,
+			'u_AlbedoIntensity': Shader3D.PERIOD_MATERIAL,
 			'u_MaterialSpecular': Shader3D.PERIOD_MATERIAL,
 			'u_Shininess': Shader3D.PERIOD_MATERIAL,
 			'u_TilingOffset': Shader3D.PERIOD_MATERIAL,
+			'u_TransmissionRate':Shader3D.PERIOD_MATERIAL,
+			'u_BackDiffuse':Shader3D.PERIOD_MATERIAL,
+			'u_BackScale':Shader3D.PERIOD_MATERIAL,
+			'u_ThinknessTexture':Shader3D.PERIOD_MATERIAL,
+			'u_TransmissionColor':Shader3D.PERIOD_MATERIAL,
 
 			'u_WorldMat': Shader3D.PERIOD_SPRITE,
 			'u_MvpMatrix': Shader3D.PERIOD_SPRITE,
 			'u_LightmapScaleOffset': Shader3D.PERIOD_SPRITE,
 			'u_LightMap': Shader3D.PERIOD_SPRITE,
 			'u_LightMapDirection': Shader3D.PERIOD_SPRITE,
+
+			'u_SimpleAnimatorTexture':Shader3D.PERIOD_SPRITE,
+			'u_SimpleAnimatorParams':Shader3D.PERIOD_SPRITE,
+			'u_SimpleAnimatorTextureSize':Shader3D.PERIOD_SPRITE,
 
 			'u_CameraPos': Shader3D.PERIOD_CAMERA,
 			'u_Viewport': Shader3D.PERIOD_CAMERA,
@@ -126,7 +157,6 @@ export class ShaderInit3D {
 			'u_ViewProjection': Shader3D.PERIOD_CAMERA,
 
 			'u_ReflectTexture': Shader3D.PERIOD_SCENE,
-			'u_ReflectIntensity': Shader3D.PERIOD_SCENE,
 			'u_FogStart': Shader3D.PERIOD_SCENE,
 			'u_FogRange': Shader3D.PERIOD_SCENE,
 			'u_FogColor': Shader3D.PERIOD_SCENE,
@@ -153,6 +183,7 @@ export class ShaderInit3D {
 			'u_AmbientSHBg': Shader3D.PERIOD_SCENE,
 			'u_AmbientSHBb': Shader3D.PERIOD_SCENE,
 			'u_AmbientSHC': Shader3D.PERIOD_SCENE,
+			
 
 			//legacy lighting
 			'u_DirectionLight.color': Shader3D.PERIOD_SCENE,
@@ -166,20 +197,13 @@ export class ShaderInit3D {
 			'u_SpotLight.spot': Shader3D.PERIOD_SCENE,
 			'u_SpotLight.color': Shader3D.PERIOD_SCENE
 		};
-		var stateMap: any = {
-			's_Cull': Shader3D.RENDER_STATE_CULL,
-			's_Blend': Shader3D.RENDER_STATE_BLEND,
-			's_BlendSrc': Shader3D.RENDER_STATE_BLEND_SRC,
-			's_BlendDst': Shader3D.RENDER_STATE_BLEND_DST,
-			's_DepthTest': Shader3D.RENDER_STATE_DEPTH_TEST,
-			's_DepthWrite': Shader3D.RENDER_STATE_DEPTH_WRITE
-		}
+	
 		var shader: Shader3D = Shader3D.add("BLINNPHONG", null, null, true);
 		var subShader: SubShader = new SubShader(attributeMap, uniformMap);
 		shader.addSubShader(subShader);
 		subShader.addShaderPass(MeshBlinnPhongVS, MeshBlinnPhongPS, stateMap, "Forward");
 		var shaderPass: ShaderPass = subShader.addShaderPass(MeshBlinnPhongShadowCasterVS, MeshBlinnPhongShadowCasterPS, stateMap, "ShadowCaster");
-
+		shaderPass = subShader.addShaderPass(DepthNormalsTextureVS,DepthNormalsTextureFS,stateMap,"DepthNormal");
 		//LineShader
 		attributeMap = {
 			'a_Position': VertexMesh.MESH_POSITION0,
@@ -189,14 +213,7 @@ export class ShaderInit3D {
 			'u_MvpMatrix': Shader3D.PERIOD_SPRITE,
 			'u_Color': Shader3D.PERIOD_MATERIAL
 		};
-		stateMap = {
-			's_Cull': Shader3D.RENDER_STATE_CULL,
-			's_Blend': Shader3D.RENDER_STATE_BLEND,
-			's_BlendSrc': Shader3D.RENDER_STATE_BLEND_SRC,
-			's_BlendDst': Shader3D.RENDER_STATE_BLEND_DST,
-			's_DepthTest': Shader3D.RENDER_STATE_DEPTH_TEST,
-			's_DepthWrite': Shader3D.RENDER_STATE_DEPTH_WRITE
-		}
+	
 		shader = Shader3D.add("LineShader");
 		subShader = new SubShader(attributeMap, uniformMap);
 		shader.addSubShader(subShader);
@@ -209,7 +226,8 @@ export class ShaderInit3D {
 			'a_Texcoord0': VertexMesh.MESH_TEXTURECOORDINATE0,
 			'a_BoneWeights': VertexMesh.MESH_BLENDWEIGHT0,
 			'a_BoneIndices': VertexMesh.MESH_BLENDINDICES0,
-			'a_MvpMatrix': VertexMesh.MESH_MVPMATRIX_ROW0
+			'a_WorldMat': VertexMesh.MESH_WORLDMATRIX_ROW0,
+			'a_SimpleTextureParams':VertexMesh.MESH_SIMPLEANIMATOR
 		};
 		uniformMap = {
 			'u_Bones': Shader3D.PERIOD_CUSTOM,
@@ -218,18 +236,18 @@ export class ShaderInit3D {
 			'u_TilingOffset': Shader3D.PERIOD_MATERIAL,
 			'u_AlphaTestValue': Shader3D.PERIOD_MATERIAL,
 			'u_MvpMatrix': Shader3D.PERIOD_SPRITE,
+
+			'u_ViewProjection': Shader3D.PERIOD_CAMERA,
+
+			'u_SimpleAnimatorTexture':Shader3D.PERIOD_SPRITE,
+			'u_SimpleAnimatorParams':Shader3D.PERIOD_SPRITE,
+			'u_SimpleAnimatorTextureSize':Shader3D.PERIOD_SPRITE,
+			
 			'u_FogStart': Shader3D.PERIOD_SCENE,
 			'u_FogRange': Shader3D.PERIOD_SCENE,
 			'u_FogColor': Shader3D.PERIOD_SCENE
 		};
-		stateMap = {
-			's_Cull': Shader3D.RENDER_STATE_CULL,
-			's_Blend': Shader3D.RENDER_STATE_BLEND,
-			's_BlendSrc': Shader3D.RENDER_STATE_BLEND_SRC,
-			's_BlendDst': Shader3D.RENDER_STATE_BLEND_DST,
-			's_DepthTest': Shader3D.RENDER_STATE_DEPTH_TEST,
-			's_DepthWrite': Shader3D.RENDER_STATE_DEPTH_WRITE
-		}
+		
 		shader = Shader3D.add("Unlit", null, null, true);
 		subShader = new SubShader(attributeMap, uniformMap);
 		shader.addSubShader(subShader);
@@ -241,7 +259,8 @@ export class ShaderInit3D {
 			'a_Texcoord0': VertexMesh.MESH_TEXTURECOORDINATE0,
 			'a_BoneWeights': VertexMesh.MESH_BLENDWEIGHT0,
 			'a_BoneIndices': VertexMesh.MESH_BLENDINDICES0,
-			'a_MvpMatrix': VertexMesh.MESH_MVPMATRIX_ROW0
+			'a_WorldMat': VertexMesh.MESH_WORLDMATRIX_ROW0,
+			'a_SimpleTextureParams':VertexMesh.MESH_SIMPLEANIMATOR
 		};
 		uniformMap = {
 			'u_Bones': Shader3D.PERIOD_CUSTOM,
@@ -249,19 +268,18 @@ export class ShaderInit3D {
 			'u_AlbedoColor': Shader3D.PERIOD_MATERIAL,
 			'u_TilingOffset': Shader3D.PERIOD_MATERIAL,
 			'u_AlphaTestValue': Shader3D.PERIOD_MATERIAL,
+
+			'u_ViewProjection': Shader3D.PERIOD_CAMERA,
+			
 			'u_MvpMatrix': Shader3D.PERIOD_SPRITE,
+			'u_SimpleAnimatorTexture':Shader3D.PERIOD_SPRITE,
+			'u_SimpleAnimatorParams':Shader3D.PERIOD_SPRITE,
+			'u_SimpleAnimatorTextureSize':Shader3D.PERIOD_SPRITE,
 			'u_FogStart': Shader3D.PERIOD_SCENE,
 			'u_FogRange': Shader3D.PERIOD_SCENE,
 			'u_FogColor': Shader3D.PERIOD_SCENE
 		};
-		stateMap = {
-			's_Cull': Shader3D.RENDER_STATE_CULL,
-			's_Blend': Shader3D.RENDER_STATE_BLEND,
-			's_BlendSrc': Shader3D.RENDER_STATE_BLEND_SRC,
-			's_BlendDst': Shader3D.RENDER_STATE_BLEND_DST,
-			's_DepthTest': Shader3D.RENDER_STATE_DEPTH_TEST,
-			's_DepthWrite': Shader3D.RENDER_STATE_DEPTH_WRITE
-		}
+		
 		shader = Shader3D.add("Effect", null, null, true);
 		subShader = new SubShader(attributeMap, uniformMap);
 		shader.addSubShader(subShader);
@@ -283,7 +301,8 @@ export class ShaderInit3D {
 			'a_Random0': VertexShuriKenParticle.PARTICLE_RANDOM0,
 			'a_Random1': VertexShuriKenParticle.PARTICLE_RANDOM1,
 			'a_SimulationWorldPostion': VertexShuriKenParticle.PARTICLE_SIMULATIONWORLDPOSTION,
-			'a_SimulationWorldRotation': VertexShuriKenParticle.PARTICLE_SIMULATIONWORLDROTATION
+			'a_SimulationWorldRotation': VertexShuriKenParticle.PARTICLE_SIMULATIONWORLDROTATION,
+			'a_SimulationUV':VertexShuriKenParticle.PARTICLE_SIMULATIONUV
 		};
 		uniformMap = {
 			'u_Tintcolor': Shader3D.PERIOD_MATERIAL,
@@ -302,8 +321,10 @@ export class ShaderInit3D {
 			'u_CurrentTime': Shader3D.PERIOD_SPRITE,
 			'u_ColorOverLifeGradientAlphas': Shader3D.PERIOD_SPRITE,
 			'u_ColorOverLifeGradientColors': Shader3D.PERIOD_SPRITE,
+			'u_ColorOverLifeGradientRanges': Shader3D.PERIOD_SPRITE,
 			'u_MaxColorOverLifeGradientAlphas': Shader3D.PERIOD_SPRITE,
 			'u_MaxColorOverLifeGradientColors': Shader3D.PERIOD_SPRITE,
+			'u_MaxColorOverLifeGradientRanges': Shader3D.PERIOD_SPRITE,
 			'u_VOLVelocityConst': Shader3D.PERIOD_SPRITE,
 			'u_VOLVelocityGradientX': Shader3D.PERIOD_SPRITE,
 			'u_VOLVelocityGradientY': Shader3D.PERIOD_SPRITE,
@@ -338,6 +359,7 @@ export class ShaderInit3D {
 			'u_TSASubUVLength': Shader3D.PERIOD_SPRITE,
 			'u_TSAGradientUVs': Shader3D.PERIOD_SPRITE,
 			'u_TSAMaxGradientUVs': Shader3D.PERIOD_SPRITE,
+			'u_DragConstanct':Shader3D.PERIOD_SPRITE,
 			'u_CameraPos': Shader3D.PERIOD_CAMERA,
 			'u_CameraDirection': Shader3D.PERIOD_CAMERA,
 			'u_CameraUp': Shader3D.PERIOD_CAMERA,
@@ -347,14 +369,7 @@ export class ShaderInit3D {
 			'u_FogRange': Shader3D.PERIOD_SCENE,
 			'u_FogColor': Shader3D.PERIOD_SCENE
 		};
-		stateMap = {
-			's_Cull': Shader3D.RENDER_STATE_CULL,
-			's_Blend': Shader3D.RENDER_STATE_BLEND,
-			's_BlendSrc': Shader3D.RENDER_STATE_BLEND_SRC,
-			's_BlendDst': Shader3D.RENDER_STATE_BLEND_DST,
-			's_DepthTest': Shader3D.RENDER_STATE_DEPTH_TEST,
-			's_DepthWrite': Shader3D.RENDER_STATE_DEPTH_WRITE
-		};
+	
 		shader = Shader3D.add("PARTICLESHURIKEN");
 		subShader = new SubShader(attributeMap, uniformMap);
 		shader.addSubShader(subShader);
@@ -374,7 +389,7 @@ export class ShaderInit3D {
 		shader = Shader3D.add("SkyBox");
 		subShader = new SubShader(attributeMap, uniformMap);
 		shader.addSubShader(subShader);
-		subShader.addShaderPass(SkyBoxVS, SkyBoxPS);
+		subShader.addShaderPass(SkyBoxVS, SkyBoxPS,stateMap);
 
 		//SkyBoxProcedural
 		attributeMap = {
@@ -394,7 +409,7 @@ export class ShaderInit3D {
 		shader = Shader3D.add("SkyBoxProcedural");
 		subShader = new SubShader(attributeMap, uniformMap);
 		shader.addSubShader(subShader);
-		subShader.addShaderPass(SkyBoxProceduralVS, SkyBoxProceduralPS);
+		subShader.addShaderPass(SkyBoxProceduralVS, SkyBoxProceduralPS,stateMap);
 
 		//extendTerrain的shader
 		attributeMap = {
@@ -447,14 +462,7 @@ export class ShaderInit3D {
 			'u_SpotLight.spot': Shader3D.PERIOD_SCENE,
 			'u_SpotLight.color': Shader3D.PERIOD_SCENE
 		};
-		stateMap = {
-			's_Cull': Shader3D.RENDER_STATE_CULL,
-			's_Blend': Shader3D.RENDER_STATE_BLEND,
-			's_BlendSrc': Shader3D.RENDER_STATE_BLEND_SRC,
-			's_BlendDst': Shader3D.RENDER_STATE_BLEND_DST,
-			's_DepthTest': Shader3D.RENDER_STATE_DEPTH_TEST,
-			's_DepthWrite': Shader3D.RENDER_STATE_DEPTH_WRITE
-		};
+	
 		shader = Shader3D.add("ExtendTerrain");
 		subShader = new SubShader(attributeMap, uniformMap);
 		shader.addSubShader(subShader);
@@ -483,14 +491,7 @@ export class ShaderInit3D {
 			'u_GradientColorkey': Shader3D.PERIOD_SPRITE,
 			'u_GradientAlphakey': Shader3D.PERIOD_SPRITE
 		};
-		stateMap = {
-			's_Cull': Shader3D.RENDER_STATE_CULL,
-			's_Blend': Shader3D.RENDER_STATE_BLEND,
-			's_BlendSrc': Shader3D.RENDER_STATE_BLEND_SRC,
-			's_BlendDst': Shader3D.RENDER_STATE_BLEND_DST,
-			's_DepthTest': Shader3D.RENDER_STATE_DEPTH_TEST,
-			's_DepthWrite': Shader3D.RENDER_STATE_DEPTH_WRITE
-		};
+		
 		shader = Shader3D.add("Trail");
 		subShader = new SubShader(attributeMap, uniformMap);
 		shader.addSubShader(subShader);
@@ -516,7 +517,7 @@ export class ShaderInit3D {
 		shader = Shader3D.add("WaterPrimary");
 		subShader = new SubShader(attributeMap, uniformMap);
 		shader.addSubShader(subShader);
-		subShader.addShaderPass(WaterPrimaryVS, WaterPrimaryPS);
+		subShader.addShaderPass(WaterPrimaryVS, WaterPrimaryPS,stateMap);
 
 
 		//BlitScreen
@@ -530,7 +531,7 @@ export class ShaderInit3D {
 		shader = Shader3D.add("BlitScreen");
 		subShader = new SubShader(attributeMap, uniformMap);
 		shader.addSubShader(subShader);
-		var shaderPass: ShaderPass = subShader.addShaderPass(BlitScreenVS, BlitScreenPS);
+		var shaderPass: ShaderPass = subShader.addShaderPass(BlitScreenVS, BlitScreenPS,stateMap);
 		var renderState: RenderState = shaderPass.renderState;
 		renderState.depthTest = RenderState.DEPTHTEST_ALWAYS;
 		renderState.depthWrite = false;
@@ -625,7 +626,7 @@ export class ShaderInit3D {
 
 		subShader = new SubShader(attributeMap, uniformMap);
 		shader.addSubShader(subShader);
-		shaderPass = subShader.addShaderPass(CompositeVS, CompositePS);
+		shaderPass = subShader.addShaderPass(CompositeVS, CompositePS,stateMap);
 		renderState = shaderPass.renderState;
 		renderState.depthTest = RenderState.DEPTHTEST_ALWAYS;
 		renderState.depthWrite = false;

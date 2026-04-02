@@ -8,7 +8,6 @@ import { Viewport } from "../../math/Viewport"
 import { RenderTexture } from "../../resource/RenderTexture"
 import { Shader3D } from "../../shader/Shader3D"
 import { ShaderData } from "../../shader/ShaderData"
-import { BaseTexture } from "../../../resource/BaseTexture"
 import { Texture2D } from "../../../resource/Texture2D"
 import { RenderTextureFormat, RenderTextureDepthFormat } from "../../../resource/RenderTextureFormat";
 import { FilterMode } from "../../../resource/FilterMode";
@@ -31,17 +30,17 @@ export class BloomEffect extends PostProcessEffect {
 	static SHADERVALUE_BLOOMTEX: number = Shader3D.propertyNameToID("u_BloomTex");
 
 	/**@internal */
-	private static SUBSHADER_PREFILTER13: number = 0;
+	static SUBSHADER_PREFILTER13: number = 0;
 	/**@internal */
-	private static SUBSHADER_PREFILTER4: number = 1;
+	static SUBSHADER_PREFILTER4: number = 1;
 	/**@internal */
-	private static SUBSHADER_DOWNSAMPLE13: number = 2;
+	static SUBSHADER_DOWNSAMPLE13: number = 2;
 	/**@internal */
-	private static SUBSHADER_DOWNSAMPLE4: number = 3;
+	static SUBSHADER_DOWNSAMPLE4: number = 3;
 	/**@internal */
-	private static SUBSHADER_UPSAMPLETENT: number = 4;
+	static SUBSHADER_UPSAMPLETENT: number = 4;
 	/**@internal */
-	private static SUBSHADER_UPSAMPLEBOX: number = 5;
+	static SUBSHADER_UPSAMPLEBOX: number = 5;
 
 	/**@internal */
 	private static MAXPYRAMIDSIZE: number = 16; // Just to make sure we handle 64k screens... Future-proof!
@@ -302,6 +301,10 @@ export class BloomEffect extends PostProcessEffect {
 		compositeShaderData.setTexture(PostProcess.SHADERVALUE_BLOOM_DIRTTEX, dirtTexture);
 		compositeShaderData.setTexture(PostProcess.SHADERVALUE_BLOOMTEX, lastUpTexture);
 		compositeShaderData.setVector(PostProcess.SHADERVALUE_BLOOMTEX_TEXELSIZE, this._bloomTextureTexelSize);
+
+		let _compositeShader: Shader3D = Shader3D.find("PostProcessComposite");
+
+		cmd.blitScreenTriangle(context.source, context.destination, context.camera._screenOffsetScale, _compositeShader ,compositeShaderData, 0, true);
 
 
 		//释放渲染纹理

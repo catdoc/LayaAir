@@ -47,21 +47,11 @@ import { VertexPositionTexture0 } from "./laya/d3/graphics/Vertex/VertexPosition
 import { VertexShurikenParticleBillboard } from "./laya/d3/graphics/Vertex/VertexShurikenParticleBillboard";
 import { VertexShurikenParticleMesh } from "./laya/d3/graphics/Vertex/VertexShurikenParticleMesh";
 import { VertexElementFormat } from "./laya/d3/graphics/VertexElementFormat";
-import { HalfFloatUtils } from "./laya/d3/math/HalfFloatUtils";
 import { Matrix4x4 } from "./laya/d3/math/Matrix4x4";
 import { BulletInteractive } from "./laya/d3/physics/BulletInteractive";
 import { CharacterController } from "./laya/d3/physics/CharacterController";
-import { Physics3D } from "./laya/d3/physics/Physics3D";
 import { PhysicsCollider } from "./laya/d3/physics/PhysicsCollider";
-import { PhysicsComponent } from "./laya/d3/physics/PhysicsComponent";
-import { PhysicsSettings } from "./laya/d3/physics/PhysicsSettings";
-import { PhysicsSimulation } from "./laya/d3/physics/PhysicsSimulation";
 import { Rigidbody3D } from "./laya/d3/physics/Rigidbody3D";
-import { BoxColliderShape } from "./laya/d3/physics/shape/BoxColliderShape";
-import { ColliderShape } from "./laya/d3/physics/shape/ColliderShape";
-import { CompoundColliderShape } from "./laya/d3/physics/shape/CompoundColliderShape";
-import { CylinderColliderShape } from "./laya/d3/physics/shape/CylinderColliderShape";
-import { StaticPlaneColliderShape } from "./laya/d3/physics/shape/StaticPlaneColliderShape";
 import { Mesh } from "./laya/d3/resource/models/Mesh";
 import { PrimitiveMesh } from "./laya/d3/resource/models/PrimitiveMesh";
 import { SkyBox } from "./laya/d3/resource/models/SkyBox";
@@ -97,6 +87,17 @@ import { WebGLContext } from "./laya/webgl/WebGLContext";
 import { MeshReader } from "./laya/d3/loaders/MeshReader";
 import { SkyPanoramicMaterial } from "./laya/d3/core/material/SkyPanoramicMaterial";
 import { ShadowUtils } from "./laya/d3/core/light/ShadowUtils";
+import { FixedConstraint } from "./laya/d3/physics/constraints/FixedConstraint";
+import { ConfigurableConstraint } from "./laya/d3/physics/constraints/ConfigurableConstraint";
+import { ShadowLightType } from "./laya/d3/shadowMap/ShadowCasterPass";
+import { SimpleSkinnedMeshSprite3D } from "./laya/d3/core/SimpleSkinnedMeshSprite3D";
+import { HalfFloatUtils } from "./laya/utils/HalfFloatUtils";
+import { Physics3D } from "./laya/d3/Physics3D";
+import { Camera } from "./laya/d3/core/Camera";
+import { CommandBuffer } from "./laya/d3/core/render/command/CommandBuffer";
+import { RenderElement } from "./laya/d3/core/render/RenderElement";
+import { SubMeshRenderElement } from "./laya/d3/core/render/SubMeshRenderElement";
+import { RenderState } from "./laya/d3/core/material/RenderState";
 /**
  * <code>Laya3D</code> 类用于初始化3D设置。
  */
@@ -121,6 +122,8 @@ export class Laya3D {
 	static TERRAINHEIGHTDATA: string = "TERRAINHEIGHTDATA";
 	/**Terrain资源。*/
 	static TERRAINRES: string = "TERRAIN";
+	/**SimpleAnimator资源。 */
+	static SIMPLEANIMATORBIN: string = "SIMPLEANIMATOR";
 
 	/**@internal */
 	private static _innerFirstLevelLoaderManager: LoaderManager = new LoaderManager();//Mesh 
@@ -137,9 +140,6 @@ export class Laya3D {
 
 	/**@internal */
 	static _editerEnvironment: boolean = false;
-
-	/**@private */
-	static physicsSettings: PhysicsSettings = new PhysicsSettings();//TODO:
 
 	/**
 	 * 获取是否可以启用物理。
@@ -201,9 +201,19 @@ export class Laya3D {
 		ILaya3D.SubMeshDynamicBatch = SubMeshDynamicBatch;
 		ILaya3D.Laya3D = Laya3D;
 		ILaya3D.Matrix4x4 = Matrix4x4;
-
+		ILaya3D.Physics3D = Physics3D;
+		ILaya3D.ShadowLightType = ShadowLightType;
+		ILaya3D.Camera = Camera;
+		ILaya3D.CommandBuffer = CommandBuffer;
+		ILaya3D.RenderElement = RenderElement;
+		ILaya3D.SubMeshRenderElement = SubMeshRenderElement;
 		//函数里面会有判断isConchApp
 		Laya3D.enableNative3D();
+
+		if(config.isUseCannonPhysicsEngine)
+		Physics3D.__cannoninit__();
+		
+		Physics3D.__bulletinit__();
 
 		VertexElementFormat.__init__();
 		VertexMesh.__init__();
@@ -215,20 +225,7 @@ export class Laya3D {
 		PixelLineVertex.__init__();
 		SubMeshInstanceBatch.__init__();
 		SubMeshDynamicBatch.__init__();
-
-		Physics3D._bullet = (window as any).Physics3D;
-		if (Physics3D._bullet) {
-			StaticPlaneColliderShape.__init__();
-			ColliderShape.__init__();
-			CompoundColliderShape.__init__();
-			PhysicsComponent.__init__();
-			PhysicsSimulation.__init__();
-			BoxColliderShape.__init__();
-			CylinderColliderShape.__init__();
-			CharacterController.__init__();
-			Rigidbody3D.__init__();
-		}
-
+		RenderState.__init__(LayaGL.instance);
 		ShaderInit3D.__init__();
 		ShadowUtils.init();
 		PBRMaterial.__init__();
@@ -241,6 +238,7 @@ export class Laya3D {
 		RenderableSprite3D.__init__();
 		MeshSprite3D.__init__();
 		SkinnedMeshSprite3D.__init__();
+		SimpleSkinnedMeshSprite3D.__init__();
 		ShuriKenParticle3D.__init__();
 		TrailSprite3D.__init__();
 		PostProcess.__init__();
@@ -287,6 +285,8 @@ export class Laya3D {
 		ClassUtils.regClass("CharacterController", CharacterController);
 		ClassUtils.regClass("Animator", Animator);
 		ClassUtils.regClass("Rigidbody3D", Rigidbody3D);
+		ClassUtils.regClass("FixedConstraint", FixedConstraint);
+		ClassUtils.regClass("ConfigurableConstraint",ConfigurableConstraint);
 
 
 		PixelLineMaterial.defaultMaterial = new PixelLineMaterial();
@@ -338,6 +338,9 @@ export class Laya3D {
 		createMap["lav"] = [Laya3D.AVATAR, Avatar._parse];
 		createMap["ltc"] = [Laya3D.TEXTURECUBE, TextureCube._parse];
 		createMap["ltcb"] = [Laya3D.TEXTURECUBEBIN, TextureCube._parseBin];
+		//为其他平台添加的兼容代码,临时TODO：
+		createMap["ltcb.ls"] = [Laya3D.TEXTURECUBEBIN, TextureCube._parseBin];
+		createMap["lanit.ls"] = [Laya3D.TEXTURE2D,Texture2D._SimpleAnimatorTextureParse];
 
 		var parserMap: any = Loader.parserMap;
 		parserMap[Laya3D.HIERARCHY] = Laya3D._loadHierarchy;
@@ -348,6 +351,7 @@ export class Laya3D {
 		parserMap[Laya3D.TEXTURE2D] = Laya3D._loadTexture2D;
 		parserMap[Laya3D.ANIMATIONCLIP] = Laya3D._loadAnimationClip;
 		parserMap[Laya3D.AVATAR] = Laya3D._loadAvatar;
+		parserMap[Laya3D.SIMPLEANIMATORBIN] = Laya3D._loadSimpleAnimator;
 		//parserMap[Laya3D.TERRAINRES] = _loadTerrain;
 		//parserMap[Laya3D.TERRAINHEIGHTDATA] = _loadTerrain;
 
@@ -397,16 +401,7 @@ export class Laya3D {
 			LayaGLRunner.uploadShaderUniforms = LayaGLRunner.uploadShaderUniformsForNative;
 		}
 
-		if (Render.supportWebGLPlusCulling) {
-			frustumCulling.renderObjectCulling = FrustumCulling.renderObjectCullingNative;
-		}
 
-		if (Render.supportWebGLPlusAnimation) {
-			avatar.prototype._cloneDatasToAnimator = avatar.prototype._cloneDatasToAnimatorNative;
-			var animationClip: any = AnimationClip;
-			animationClip.prototype._evaluateClipDatasRealTime = animationClip.prototype._evaluateClipDatasRealTimeForNative;
-			skinnedMeshRender.prototype._computeSkinnedData = skinnedMeshRender.prototype._computeSkinnedDataForNative;
-		}
 	}
 
 	/**
@@ -506,13 +501,18 @@ export class Laya3D {
 			case "TrailSprite3D":
 			case "MeshSprite3D":
 			case "SkinnedMeshSprite3D":
+			case "SimpleSkinnedMeshSprite3D":
 				var meshPath: string = props.meshPath;
 				(meshPath) && (props.meshPath = Laya3D._addHierarchyInnerUrls(firstLevelUrls, subUrls, urlVersion, hierarchyBasePath, meshPath, Laya3D.MESH));
 				var materials: any[] = props.materials;
 				if (materials)
 					for (i = 0, n = materials.length; i < n; i++)
 						materials[i].path = Laya3D._addHierarchyInnerUrls(secondLevelUrls, subUrls, urlVersion, hierarchyBasePath, materials[i].path, Laya3D.MATERIAL);
+				if(node.type=="SimpleSkinnedMeshSprite3D")
+					if(props.animatorTexture)
+						props.animatorTexture = Laya3D._addHierarchyInnerUrls(fourthLelUrls,subUrls,urlVersion, hierarchyBasePath,props.animatorTexture,Laya3D.SIMPLEANIMATORBIN)
 				break;
+			
 			case "ShuriKenParticle3D":
 				if (props.main) {
 					var resources: any = props.renderer.resources;
@@ -529,6 +529,10 @@ export class Laya3D {
 				break;
 			case "Terrain":
 				Laya3D._addHierarchyInnerUrls(fourthLelUrls, subUrls, urlVersion, hierarchyBasePath, props.dataPath, Laya3D.TERRAINRES);
+				break;
+			case "ReflectionProbe":
+				var reflection = props.reflection;
+				(reflection) && (props.reflection = Laya3D._addHierarchyInnerUrls(firstLevelUrls, subUrls, urlVersion, hierarchyBasePath, reflection, Laya3D.TEXTURECUBEBIN));
 				break;
 		}
 
@@ -573,6 +577,7 @@ export class Laya3D {
 		}
 
 		var children: any[] = node.child;
+		if(!children) return;
 		for (i = 0, n = children.length; i < n; i++)
 			Laya3D._getSprite3DHierarchyInnerUrls(children[i], firstLevelUrls, secondLevelUrls, thirdLevelUrls, fourthLelUrls, subUrls, urlVersion, hierarchyBasePath);
 	}
@@ -581,6 +586,7 @@ export class Laya3D {
 	 *@internal
 	 */
 	private static _loadHierarchy(loader: Loader): void {
+		loader._originType = loader.type;
 		loader.on(Event.LOADED, null, Laya3D._onHierarchylhLoaded, [loader]);
 		loader.load(loader.url, Loader.JSON, false, null, true);
 	}
@@ -700,6 +706,7 @@ export class Laya3D {
 		switch (version) {
 			case "LAYAMATERIAL:01":
 			case "LAYAMATERIAL:02":
+			case "LAYAMATERIAL:03":
 				var i: number, n: number;
 				var textures: any[] = lmatData.props.textures;
 				if (textures) {
@@ -754,6 +761,18 @@ export class Laya3D {
 		});
 		loader.load(loader.url, Loader.JSON, false, null, true);
 	}
+	
+	/**
+	 *@internal 
+	 */
+	private static _loadSimpleAnimator(loader:Loader):void{
+		loader.on(Event.LOADED,null,function(data:any):void{
+			loader._cache = loader._createCache;
+			var texture: Texture2D = Texture2D._SimpleAnimatorTextureParse(data, loader._propertyParams, loader._constructParams);
+			Laya3D._endLoad(loader,texture);
+		});
+		loader.load(loader.url,Loader.BUFFER,false,null,true)
+	}
 
 	/**
 	 *@internal
@@ -761,7 +780,7 @@ export class Laya3D {
 	private static _loadAnimationClip(loader: Loader): void {
 		loader.on(Event.LOADED, null, function (data: any): void {
 			loader._cache = loader._createCache;
-			var clip: AnimationClip = AnimationClip._parse(data, loader._propertyParams, loader._constructParams);
+			var clip: AnimationClip = AnimationClip._parse(data);
 			Laya3D._endLoad(loader, clip);
 		});
 		loader.load(loader.url, Loader.BUFFER, false, null, true);
@@ -786,9 +805,18 @@ export class Laya3D {
 				type = "nativeimage";
 				break;
 			case "dds":
+				type = Loader.BUFFER;
+				//TODO:
+				break;
 			case "ktx":
+				type = Loader.BUFFER;
+				(!loader._constructParams)&&(loader._constructParams = []);
+				loader._constructParams[2] = TextureFormat.KTXTEXTURE;
+				break;
 			case "pvr":
 				type = Loader.BUFFER;
+				(!loader._constructParams)&&(loader._constructParams = []);
+				loader._constructParams[2] = TextureFormat.PVRTEXTURE;
 				break;
 		}
 
@@ -885,7 +913,7 @@ export class Laya3D {
 	 */
 	private static _onProcessChange(loader: Loader, offset: number, weight: number, process: number): void {
 		process = offset + process * weight;
-		(process < 1.0) && (loader.event(Event.PROGRESS, process));
+		(process < 1.0) && (loader.event(Event.PROGRESS, process *2/3+ 1/3));
 	}
 
 	/**
@@ -910,7 +938,7 @@ export class Laya3D {
 		Scene3D.octreeLooseness = config.octreeLooseness;
 
 		var physics3D: Function = (window as any).Physics3D;
-		if (physics3D == null) {
+		if (physics3D == null||config.isUseCannonPhysicsEngine) {
 			Physics3D._enablePhysics = false;
 			Laya3D.__init__(width, height, config);
 			compolete && compolete.run();

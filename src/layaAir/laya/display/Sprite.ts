@@ -223,13 +223,13 @@ export class Sprite extends Node {
     /**@internal */
     _renderType: number = 0;
     /**@internal */
-    _transform: Matrix = null;
+    _transform: Matrix|null = null;
     /**@internal */
     protected _tfChanged: boolean = false;
     /**@internal */
     protected _repaint: number = SpriteConst.REPAINT_NONE;
     /**@internal */
-    private _texture: Texture = null;
+    private _texture: Texture|null = null;
 
     //以下变量为系统调用，请不要直接使用
     /**@internal */
@@ -237,9 +237,9 @@ export class Sprite extends Node {
     /**@internal */
     _cacheStyle: CacheStyle = CacheStyle.EMPTY;
     /**@internal */
-    _boundStyle: BoundsStyle = null;
+    _boundStyle: BoundsStyle|null = null;
     /**@internal */
-    _graphics: Graphics = null;
+    _graphics: Graphics|null = null;
 
     /**
      * <p>鼠标事件与此对象的碰撞检测是否可穿透。碰撞检测发生在鼠标事件的捕获阶段，此阶段引擎会从stage开始递归检测stage及其子对象，直到找到命中的目标对象或者未命中任何对象。</p>
@@ -262,14 +262,16 @@ export class Sprite extends Node {
      */
     hitTestPrior: boolean = false;
 
-    /**@inheritDoc 
+    /**
+     * @inheritDoc 
      * @override
-    */
+     */
     destroy(destroyChild: boolean = true): void {
         super.destroy(destroyChild);
         this._style && this._style.recover();
         this._cacheStyle && this._cacheStyle.recover();
         this._boundStyle && this._boundStyle.recover();
+        this._transform && this._transform.recover();
         this._style = null;
         this._cacheStyle = null;
         this._boundStyle = null;
@@ -315,13 +317,13 @@ export class Sprite extends Node {
     }
 
     /**
-     * <p>指定显示对象是否缓存为静态图像，cacheAs时，子对象发生变化，会自动重新缓存，同时也可以手动调用reCache方法更新缓存。</p>
-     * <p>建议把不经常变化的“复杂内容”缓存为静态图像，能极大提高渲染性能。cacheAs有"none"，"normal"和"bitmap"三个值可选。
-     * <li>默认为"none"，不做任何缓存。</li>
-     * <li>当值为"normal"时，canvas模式下进行画布缓存，webgl模式下进行命令缓存。</li>
-     * <li>当值为"bitmap"时，canvas模式下进行依然是画布缓存，webgl模式下使用renderTarget缓存。</li></p>
-     * <p>webgl下renderTarget缓存模式缺点：会额外创建renderTarget对象，增加内存开销，缓存面积有最大2048限制，不断重绘时会增加CPU开销。优点：大幅减少drawcall，渲染性能最高。
-     * webgl下命令缓存模式缺点：只会减少节点遍历及命令组织，不会减少drawcall数，性能中等。优点：没有额外内存开销，无需renderTarget支持。</p>
+     * 指定显示对象是否缓存为静态图像，cacheAs时，子对象发生变化，会自动重新缓存，同时也可以手动调用reCache方法更新缓存。
+     * 建议把不经常变化的“复杂内容”缓存为静态图像，能极大提高渲染性能。cacheAs有"none"，"normal"和"bitmap"三个值可选。
+     * 默认为"none"，不做任何缓存。
+     * 当值为"normal"时，canvas模式下进行画布缓存，webgl模式下进行命令缓存。
+     * 当值为"bitmap"时，canvas模式下进行依然是画布缓存，webgl模式下使用renderTarget缓存。
+     * webgl下renderTarget缓存模式缺点：会额外创建renderTarget对象，增加内存开销，缓存面积有最大2048限制，不断重绘时会增加CPU开销。优点：大幅减少drawcall，渲染性能最高。
+     * webgl下命令缓存模式缺点：只会减少节点遍历及命令组织，不会减少drawcall数，性能中等。优点：没有额外内存开销，无需renderTarget支持。
      */
     get cacheAs(): string {
         return this._cacheStyle.cacheAs;
@@ -618,11 +620,11 @@ export class Sprite extends Node {
             pList = this._graphics.getBoundPoints();
         } else {
             pList = Utils.clearArray(this._boundStyle.temBM);
-            if (this._texture) {
-                rec = Rectangle.TEMP;
-                rec.setTo(0, 0, this.width || this._texture.width, this.height || this._texture.height);
-                Utils.concatArray(pList, rec._getBoundPoints());
-            }
+        }
+        if (this._texture) {
+            rec = Rectangle.TEMP;
+            rec.setTo(0, 0, this.width || this._texture.width, this.height || this._texture.height);
+            Utils.concatArray(pList, rec._getBoundPoints());
         }
         //处理子对象区域
         var child: Sprite;
@@ -1271,12 +1273,14 @@ export class Sprite extends Node {
 		}else{
 			ctx.asBitmap=true;
 		}
-        ctx._targets.start();
-        ctx._targets.clear(0, 0, 0, 0);	// 否则没有地方调用clear
-        RenderSprite.renders[_renderType]._fun(sprite, ctx, offsetX, offsetY);
-        ctx.flush();
-        ctx._targets.end();
-		ctx._targets.restore();
+		if(ctx._targets){
+			ctx._targets.start();
+			ctx._targets.clear(0, 0, 0, 0);	// 否则没有地方调用clear
+			RenderSprite.renders[_renderType]._fun(sprite, ctx, offsetX, offsetY);
+			ctx.flush();
+			ctx._targets.end();
+			ctx._targets.restore();
+		}
 		if(!rt){
         	var rtex: Texture = new Texture(((<Texture2D>(ctx._targets as any))), Texture.INV_UV);
         	ctx.destroy(true);// 保留 _targets
@@ -1317,7 +1321,7 @@ export class Sprite extends Node {
 
     set filters(value: any[]) {
         value && value.length === 0 && (value = null);
-        if (this._cacheStyle.filters == value) return;
+//        if (this._cacheStyle.filters == value) return;
         this._getCacheStyle().filters = value ? value.slice() : null;
         if (value && value.length) {
             //temp TODO 
@@ -1374,7 +1378,7 @@ export class Sprite extends Node {
      * @param globalNode		global节点，默认为Laya.stage
      * @return 转换后的坐标的点。
      */
-    localToGlobal(point: Point, createNewPoint: boolean = false, globalNode: Sprite = null): Point {
+    localToGlobal(point: Point, createNewPoint: boolean = false, globalNode: Sprite|null = null): Point {
         //if (!_displayedInStage || !point) return point;
         if (createNewPoint === true) {
             point = new Point(point.x, point.y);
@@ -1397,7 +1401,7 @@ export class Sprite extends Node {
      * @param globalNode		global节点，默认为Laya.stage
      * @return 转换后的坐标的点。
      */
-    globalToLocal(point: Point, createNewPoint: boolean = false, globalNode: Sprite = null): Point {
+    globalToLocal(point: Point, createNewPoint: boolean = false, globalNode: Sprite|null = null): Point {
         //if (!_displayedInStage || !point) return point;
         if (createNewPoint) {
             point = new Point(point.x, point.y);

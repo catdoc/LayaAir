@@ -86,6 +86,7 @@ import { PerformanceTest_Maggots } from "./../2d/PerformanceTest_Maggots";
 import { PerformanceTest_Cartoon } from "./../2d/PerformanceTest_Cartoon";
 import { PerformanceTest_Cartoon2 } from "./../2d/PerformanceTest_Cartoon2";
 import { PerformanceTest_Skeleton } from "./../2d/PerformanceTest_Skeleton";
+import { Skeleton_SpineAdapted } from "../2d/Skeleton_SpineAdapted";
 import { IDE_Project } from "./../2d/IDE_Project";
 import { Laya } from "Laya";
 import { Event } from "laya/events/Event"
@@ -97,7 +98,15 @@ import { Event } from "laya/events/Event"
 	import { IndexViewUI } from "../ui/IndexViewUI"
 import { Sprite } from "laya/display/Sprite";
 import { Main } from "../Main";
-import Sprite_ScreenShot from "../2d/Sprite_Screenshot";
+import Sprite_ScreenShot from "../2d/Sprite_ScreenShot";
+import { Physics_Tumbler } from "../2d/PhySics_Tumbler";
+import { Physics_CollisionFiltering } from "../2d/Physics_CollisionFiltering";
+import { Physics_Strandbeests } from "../2d/Physics_Strandbeests";
+import { Physics_Bridge } from "../2d/Physics_Bridge";
+import { Physics_CollisionEvent } from "../2d/Physics_CollisionEvent";
+import { Utils } from "laya/utils/Utils";
+import Client from "../Client";
+import { UI_FontClip } from "../2d/UI_FontClip";
 	
 	/**
 	 * 首页View 
@@ -114,7 +123,7 @@ import Sprite_ScreenShot from "../2d/Sprite_Screenshot";
 		
 		//---------------------------------------------------------------------------------2D------------开始---------------------------------------------
 		
-		private _comboxBigArr:any[] = ['Sprite','动画','骨骼动画','混合模式','区块地图','滤镜','粒子','音频','文本','UI','计时器','缓动','鼠标交互','屏幕适配','网络和格式','调试','性能测试','IDE'];
+		private _comboxBigArr:any[] = ['Sprite','动画','骨骼动画','混合模式','区块地图','滤镜','粒子','音频','文本','UI','计时器','缓动','鼠标交互','屏幕适配','网络和格式','调试','性能测试','IDE', '物理'];
 		/************************sprite-start***************************/
 		private _comboBoxSpriteClsArr:any[] = [Sprite_DisplayImage,Sprite_Container,Sprite_RoateAndScale,Sprite_DrawPath,Sprite_MagnifyingGlass,Sprite_DrawShapes,Sprite_Cache,Sprite_NodeControl,Sprite_Pivot,Sprite_SwitchTexture,Sprite_ScreenShot];
 		private _comboBoxSpriteArr:any[] = ['显示图片','容器','旋转缩放','根据数据绘制路径','遮罩-放大镜','绘制各种形状','缓存为静态图像','节点控制','轴中心','切换纹理','截图'];
@@ -126,8 +135,8 @@ import Sprite_ScreenShot from "../2d/Sprite_Screenshot";
 		/************************Animation-end***************************/
 		
 		/************************Skeleton-start***************************/
-		private _comboBoxSkeletonClsArr:any[] = [Skeleton_MultiTexture,Skeleton_SpineEvent,Skeleton_SpineIkMesh,Skeleton_SpineVine,Skeleton_ChangeSkin];
-		private _comboBoxSkeletonArr:any[] = ['多纹理','Spine事件','橡胶人','藤蔓','换装'];
+		private _comboBoxSkeletonClsArr:any[] = [Skeleton_MultiTexture,Skeleton_SpineEvent,Skeleton_SpineIkMesh,Skeleton_SpineVine,Skeleton_ChangeSkin,Skeleton_SpineAdapted];
+		private _comboBoxSkeletonArr:any[] = ['多纹理','Spine事件','橡胶人','藤蔓','换装','SpineDemo'];
 		/************************Skeleton-end***************************/
 		
 		/************************BlendMode-start***************************/
@@ -161,8 +170,8 @@ import Sprite_ScreenShot from "../2d/Sprite_Screenshot";
 		/************************Text-end***************************/
 		
 		/************************UI-start***************************/
-		private _comboBoxUIClsArr:any[] = [UI_Label,UI_Button,UI_RadioGroup,UI_CheckBox,UI_Clip,UI_ColorPicker,UI_ComboBox,UI_Dialog,UI_ScrollBar,UI_Slider,UI_Image,UI_List,UI_ProgressBar,UI_Tab,UI_Input,UI_TextArea,UI_Tree];
-		private _comboBoxUIArr:any[] = ['Label','Button','RadioGroup','CheckBox','Clip','ColorPicker','ComboBox','Dialog','ScrollBar','Slider','Image','List','ProgressBar','Tab','Input','TextArea','Tree'];
+		private _comboBoxUIClsArr:any[] = [UI_Label,UI_Button,UI_RadioGroup,UI_CheckBox,UI_Clip,UI_FontClip,UI_ColorPicker,UI_ComboBox,UI_Dialog,UI_ScrollBar,UI_Slider,UI_Image,UI_List,UI_ProgressBar,UI_Tab,UI_Input,UI_TextArea,UI_Tree];
+		private _comboBoxUIArr:any[] = ['Label','Button','RadioGroup','CheckBox','Clip','FontClip','ColorPicker','ComboBox','Dialog','ScrollBar','Slider','Image','List','ProgressBar','Tab','Input','TextArea','Tree'];
 		/************************UI-end***************************/
 		
 		/************************Timer-start***************************/
@@ -204,11 +213,16 @@ import Sprite_ScreenShot from "../2d/Sprite_Screenshot";
 		private _comboBoxIDEClsArr:any[] = [IDE_Project];
 		private _comboBoxIDEArr:any[] = ['显示IDE创建的界面'];
 		/************************IDE-end***************************/
+
+		/************************Particle-start***************************/
+		private _comboBoxPhysicsClsArr:any[] = [Physics_Tumbler, Physics_CollisionFiltering, Physics_CollisionEvent, Physics_Bridge, Physics_Strandbeests];
+		private _comboBoxPhysicsArr:any[] = ['复合碰撞器', '碰撞过滤器', '碰撞事件与传感器', '桥', '仿生机器人'];
+		/************************Particle-end***************************/
 	
 		//private _VIPClsArr:any[] = [VIPMergeBinary_as,VIPMergeText,VIPTexturetrans_as_a,VIPTexturetrans_as_b];
 		private _VIPArr:any[] = ['VIP_MergeBinary',"VIP_MergeText","VIP_Texturetrans_a","VIP_Texturetrans_b"];
 		
-		private _bigIndex:number =0;
+		private _bigIndex:number = -1;
 		private _smallIndex:number;
 		private _oldView:any;
 		private Main:typeof Main;
@@ -259,9 +273,11 @@ import Sprite_ScreenShot from "../2d/Sprite_Screenshot";
 			this.btn.on(Event.MOUSE_DOWN, this, this.nextBtn);
 		}
 		
-		private nextBtn():void {
+		private nextBtn():void{
 			//_bigIndex += 1;
-			var i_length:number
+			var isMaster:any = Utils.getQueryString("isMaster");
+			
+			var i_length:number;
 			this.a_length = this._bigIndex;
 			if (this.smallComBox.selectedIndex == this.b_length)
 			{
@@ -272,8 +288,17 @@ import Sprite_ScreenShot from "../2d/Sprite_Screenshot";
 			{
 				i_length = this.smallComBox.selectedIndex+1;
 			}
-			this.switchFunc(this.a_length, i_length);
-			
+			var bigType:number = this.a_length;
+			var smallType:number = i_length;
+			if(Main.isOpenSocket && parseInt(isMaster)==1)
+			{
+				//主控制推送
+				Client.instance.send({type:"next",bigType:bigType,smallType:smallType,isMaster:isMaster});
+			}else
+			{
+				
+				this.switchFunc(this.a_length, i_length);
+			}
 		}
 		
 		private initEvent():void
@@ -281,6 +306,26 @@ import Sprite_ScreenShot from "../2d/Sprite_Screenshot";
 			
 			this.bigComBox.selectHandler = new Handler(this,this.onBigComBoxSelectHandler);
 			this.smallComBox.selectHandler = new Handler(this,this.onSmallBoxSelectHandler);
+			Laya.stage.on("next",this,this.onNext);
+		}
+
+		onNext(data:any)
+		{
+			
+			if(data.hasOwnProperty("bigType"))
+			{
+				//示例切换
+				this.a_length = data.bigType;
+				var smallType:number = data.smallType;
+				this.switchFunc(this.a_length, smallType);
+			}
+			else
+			{
+				var isMaster:any = parseInt(Utils.getQueryString("isMaster"))||0;
+				if(isMaster)return;
+				//示例内单独小类型切换
+				this._oldView && this._oldView['stypeFun'+data.stype] && this._oldView['stypeFun'+data.stype](data.value);
+			}
 		}
 		
 		private onClearPreBox():void
@@ -320,6 +365,11 @@ import Sprite_ScreenShot from "../2d/Sprite_Screenshot";
 			if ( this.btnOn && this.m_length != 0)
 			{
 				return;
+			}
+			var isMaster:any = parseInt(Utils.getQueryString("isMaster"))||0;
+			if(Main.isOpenSocket && !this.btnOn && isMaster)
+			{
+				this.onDirectSwitch();
 			}
 			this.m_length += 1;
 			this.onClearPreBox();
@@ -405,9 +455,9 @@ import Sprite_ScreenShot from "../2d/Sprite_Screenshot";
 						this._oldView = new this._comboBoxIDEClsArr[index](this.Main);
 						this.b_length = this._comboBoxIDEClsArr.length - 1;
 						break;
-					case 18://IDE
-						//this._oldView = new this._VIPClsArr[index];
-						//this.b_length = this._VIPArr.length - 1;
+					case 18: // Physics
+						this._oldView = new this._comboBoxPhysicsClsArr[index](this.Main);
+						this.b_length = this._comboBoxPhysicsClsArr.length - 1;
 						break;
 					default:
 						break;
@@ -419,83 +469,100 @@ import Sprite_ScreenShot from "../2d/Sprite_Screenshot";
 			}
 		}
 		
-		 switchFunc(bigListIndex:number,smallListIndex:number):void
+		 switchFunc(bigListIndex:number,smallListIndex:number,isAutoSwitch:boolean = true):void
 		{
 			this.btnOn = true;
 			this.m_length = 0;
 			this.bigComBox.selectedIndex = bigListIndex;
-			this.onBigComBoxSelectHandler(bigListIndex,smallListIndex);
+			this.onBigComBoxSelectHandler(bigListIndex,smallListIndex,isAutoSwitch);
 			this.btnOn = false;
 		}
 		
-		private onBigComBoxSelectHandler(index:number,smallIndex:number = 0):void
+		private onBigComBoxSelectHandler(index:number,smallIndex:number = 0,isAutoSwitch:boolean = false):void
 		{
-			this._bigIndex = index;
-			var labelStr:string;
-			switch(index)
-			{
-				case 0://sprite
-					labelStr = this._comboBoxSpriteArr.toString();
-					break;
-				case 1://animiation
-					labelStr = this._comboBoxAnimationArr.toString();
-					break;
-				case 2://animiation
-					labelStr = this._comboBoxSkeletonArr.toString();
-					break;
-				case 3://BlendMode
-					labelStr = this._comboBoxBlendModeArr.toString();
-					break;
-				case 4://TiledMap
-					labelStr = this._comboBoxTiledMapArr.toString();
-					break;
-				case 5://Filters
-					labelStr = this._comboBoxFiltersArr.toString();
-					break;
-				case 6://Particle
-					labelStr = this._comboBoxParticleArr.toString();
-					break;
-				case 7://Sound
-					labelStr = this._comboBoxSoundArr.toString();
-					break;
-				case 8://Text
-					labelStr = this._comboBoxTextArr.toString();
-					break;
-				case 9://UI
-					labelStr = this._comboBoxUIArr.toString();
-					break;
-				case 10://Timer
-					labelStr = this._comboBoxTimerArr.toString();
-					break;
-				case 11://Tween
-					labelStr = this._comboBoxTweenArr.toString();
-					break;
-				case 12://Interaction
-					labelStr = this._comboBoxInteractionArr.toString();
-					break;
-				case 13://SmartScale
-					labelStr = this._comboBoxSmartScaleArr.toString();
-					break;
-				case 14://Network
-					labelStr = this._comboBoxNetworkArr.toString();
-					break;
-				case 15://Debug
-					labelStr = this._comboBoxDebugArr.toString();
-					break;
-				case 16://PerformanceTest
-					labelStr = this._comboBoxPerformanceTestArr.toString();
-					break;
-				case 17://IDE
-					labelStr = this._comboBoxIDEArr.toString();
-					break;
-				case 18://IDE
-					//labelStr = this._VIPArr.toString();
-					break;
+			if(this._bigIndex!=index){
+				var isMaster:any = parseInt(Utils.getQueryString("isMaster"))||0;
+				if(Main.isOpenSocket && !isAutoSwitch && isMaster)
+				{
+					this.onDirectSwitch();
+					return;
+				}
+				this._bigIndex = index;
+				var labelStr:string;
+				switch(index)
+				{
+					case 0://sprite
+						labelStr = this._comboBoxSpriteArr.toString();
+						break;
+					case 1://animiation
+						labelStr = this._comboBoxAnimationArr.toString();
+						break;
+					case 2://animiation
+						labelStr = this._comboBoxSkeletonArr.toString();
+						break;
+					case 3://BlendMode
+						labelStr = this._comboBoxBlendModeArr.toString();
+						break;
+					case 4://TiledMap
+						labelStr = this._comboBoxTiledMapArr.toString();
+						break;
+					case 5://Filters
+						labelStr = this._comboBoxFiltersArr.toString();
+						break;
+					case 6://Particle
+						labelStr = this._comboBoxParticleArr.toString();
+						break;
+					case 7://Sound
+						labelStr = this._comboBoxSoundArr.toString();
+						break;
+					case 8://Text
+						labelStr = this._comboBoxTextArr.toString();
+						break;
+					case 9://UI
+						labelStr = this._comboBoxUIArr.toString();
+						break;
+					case 10://Timer
+						labelStr = this._comboBoxTimerArr.toString();
+						break;
+					case 11://Tween
+						labelStr = this._comboBoxTweenArr.toString();
+						break;
+					case 12://Interaction
+						labelStr = this._comboBoxInteractionArr.toString();
+						break;
+					case 13://SmartScale
+						labelStr = this._comboBoxSmartScaleArr.toString();
+						break;
+					case 14://Network
+						labelStr = this._comboBoxNetworkArr.toString();
+						break;
+					case 15://Debug
+						labelStr = this._comboBoxDebugArr.toString();
+						break;
+					case 16://PerformanceTest
+						labelStr = this._comboBoxPerformanceTestArr.toString();
+						break;
+					case 17://IDE
+						labelStr = this._comboBoxIDEArr.toString();
+						break;
+					case 18://Physics
+						labelStr = this._comboBoxPhysicsArr.toString();
+						break;
+				}
+				this.smallComBox.labels = labelStr;
 			}
-			this.smallComBox.labels = labelStr;
 			this.smallComBox.selectedIndex = smallIndex;
-			this.smallComBox.visibleNum = 5;//(labelStr.split(",") as Array).length;
 		}
+
+		onDirectSwitch()
+	{
+		var smallType:number = this.smallComBox.selectedIndex;
+		var bigType:number = this.bigComBox.selectedIndex;
+		if(this._bigIndex != this.bigComBox.selectedIndex)
+			smallType = 0;
+		//主控制推送
+		Client.instance.send({type:"next",bigType:bigType,smallType:smallType});
+	}
 		
 		private onRightBtnClick():void
 		{

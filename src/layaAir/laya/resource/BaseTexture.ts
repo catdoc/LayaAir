@@ -13,10 +13,7 @@ export class BaseTexture extends Bitmap {
 	/** @internal */
 	static _rgbmRange: number = 5.0;
 
-	/** @internal */
-	protected _readyed: boolean;
-	/** @internal */
-	protected _glTextureType: number;
+	
 	/** @internal */
 	protected _glTexture: any;
 	/** @internal */
@@ -34,6 +31,10 @@ export class BaseTexture extends Bitmap {
 	/** @internal */
 	protected _mipmapCount: number;
 
+	/** @internal */
+	_glTextureType: number;
+	/** @internal */
+	_readyed: boolean;
 	/**
 	 * 是否使用mipLevel
 	 */
@@ -112,6 +113,10 @@ export class BaseTexture extends Bitmap {
 		return this._mipmapCount;
 	}
 
+	set mipmapCount(value:number){
+		this._mipmapCount = value;
+	}
+
 	get defaulteTexture(): BaseTexture {
 		throw "BaseTexture:must override it."
 	}
@@ -135,6 +140,7 @@ export class BaseTexture extends Bitmap {
 	}
 
 	/**
+	 * 获取纹理格式的字节数
 	 * @internal
 	 */
 	_getFormatByteCount(): number {
@@ -147,14 +153,18 @@ export class BaseTexture extends Bitmap {
 				return 1;
 			case TextureFormat.Alpha8:
 				return 1;
+			case TextureFormat.R16G16B16A16:
+				return 2;	
 			case TextureFormat.R32G32B32A32:
 				return 4;
+			
 			default:
 				throw "Texture2D: unknown format.";
 		}
 	}
 
 	/**
+	 * 是否是2的幂次方
 	 * @internal
 	 */
 	protected _isPot(size: number): boolean {
@@ -162,6 +172,7 @@ export class BaseTexture extends Bitmap {
 	}
 
 	/**
+	 * 获取当前纹理格式(GLFormat)
 	 * @internal
 	 */
 	protected _getGLFormat(): number {
@@ -180,6 +191,7 @@ export class BaseTexture extends Bitmap {
 				glFormat = gl.ALPHA;
 				break;
 			case TextureFormat.R32G32B32A32:
+			case TextureFormat.R16G16B16A16://todo miner
 				glFormat = gl.RGBA;
 				break;
 			case TextureFormat.DXT1:
@@ -199,6 +211,30 @@ export class BaseTexture extends Bitmap {
 					glFormat = gpu._compressedTextureEtc1.COMPRESSED_RGB_ETC1_WEBGL;
 				else
 					throw "BaseTexture: not support ETC1RGB format.";
+				break;
+			case TextureFormat.ETC2RGB:
+				if(gpu._compressedTextureETC)
+					glFormat = gpu._compressedTextureETC.COMPRESSED_RGB8_ETC2;
+				else
+					throw "BaseTexture: not support ETC2RGB format.";
+				break;
+			case TextureFormat.ETC2RGBA:
+				if(gpu._compressedTextureETC)
+					glFormat = gpu._compressedTextureETC.COMPRESSED_RGBA8_ETC2_EAC;
+				else
+					throw "BaseTexture: not support ETC2RGBA format.";
+				break;
+			case TextureFormat.ETC2RGB_Alpha8:
+				if(gpu._compressedTextureETC)
+					glFormat = gpu._compressedTextureETC.COMPRESSED_SRGB8_ALPHA8_ETC2_EAC;
+				else
+					throw "BaseTexture: not support ETC2SRGB_Alpha8 format.";
+				break;
+			case TextureFormat.ETC2SRGB:
+				if(gpu._compressedTextureETC)
+					glFormat = gpu._compressedTextureETC.COMPRESSED_SRGB8_ETC2;
+				else
+					throw "BaseTexture: not support ETC2SRGB format.";
 				break;
 			case TextureFormat.PVRTCRGB_2BPPV:
 				if (gpu._compressedTexturePvrtc)
@@ -224,6 +260,67 @@ export class BaseTexture extends Bitmap {
 				else
 					throw "BaseTexture: not support PVRTCRGBA_4BPPV format.";
 				break;
+			case TextureFormat.ASTC4x4:
+				if(gpu._compressedTextureASTC)
+					glFormat = gpu._compressedTextureASTC.COMPRESSED_RGBA_ASTC_4x4_KHR;
+				else
+					throw "BaseTexture: not support ASTC4x4 format.";
+				break;
+			case TextureFormat.ASTC4x4SRGB:
+				if(gpu._compressedTextureASTC)
+					glFormat = gpu._compressedTextureASTC.COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR;
+				else
+					throw "BaseTexture: not support ASTC4x4_KHR format.";
+				break;
+			case TextureFormat.ASTC6x6:
+				if(gpu._compressedTextureASTC)
+					glFormat = gpu._compressedTextureASTC.COMPRESSED_RGBA_ASTC_6x6_KHR;
+				else
+					throw "BaseTexture: not support ASTC6x6 format.";
+				break;
+			case TextureFormat.ASTC6x6SRGB:
+				if(gpu._compressedTextureASTC)
+					glFormat = gpu._compressedTextureASTC.COMPRESSED_SRGB8_ALPHA8_ASTC_6x6_KHR;
+				else
+					throw "BaseTexture: not support ASTC6x6_KHR format.";
+				break;
+			case TextureFormat.ASTC8x8:
+				if(gpu._compressedTextureASTC)
+					glFormat = gpu._compressedTextureASTC.COMPRESSED_RGBA_ASTC_8x8_KHR;
+			else
+				throw "BaseTexture: not support ASTC8x8 format.";
+					break;
+			case TextureFormat.ASTC8x8SRGB:
+				if(gpu._compressedTextureASTC)
+					glFormat = gpu._compressedTextureASTC.COMPRESSED_SRGB8_ALPHA8_ASTC_8x8_KHR;
+				else
+				throw "BaseTexture: not support ASTC8x8 format.";
+					break;
+				
+			case TextureFormat.ASTC10x10:
+				if(gpu._compressedTextureASTC)
+					glFormat = gpu._compressedTextureASTC.COMPRESSED_RGBA_ASTC_10x10_KHR;
+				else
+					throw "BaseTexture: not support ASTC10x10 format.";
+				break;
+			case TextureFormat.ASTC10x10SRGB:
+				if(gpu._compressedTextureASTC)
+					glFormat = gpu._compressedTextureASTC.COMPRESSED_SRGB8_ALPHA8_ASTC_10x10_KHR;
+				else
+					throw "BaseTexture: not support ASTC10x10 format.";
+				break;
+			case TextureFormat.ASTC12x12:
+				if(gpu._compressedTextureASTC)
+					glFormat = gpu._compressedTextureASTC.COMPRESSED_RGBA_ASTC_12x12_KHR;
+				else
+					throw "BaseTexture: not support ASTC12x12 format.";
+				break;
+			case TextureFormat.ASTC12x12SRGB:
+				if(gpu._compressedTextureASTC)
+					glFormat = gpu._compressedTextureASTC.COMPRESSED_SRGB8_ALPHA8_ASTC_12x12_KHR;
+				else
+					throw "BaseTexture: not support ASTC12x12 format.";
+				break;
 			default:
 				throw "BaseTexture: unknown texture format.";
 		}
@@ -231,6 +328,7 @@ export class BaseTexture extends Bitmap {
 	}
 
 	/**
+	 * 设置过滤器模式
 	 * @internal
 	 */
 	protected _setFilterMode(value: FilterMode): void {
@@ -261,9 +359,11 @@ export class BaseTexture extends Bitmap {
 			default:
 				throw new Error("BaseTexture:unknown filterMode value.");
 		}
+		WebGLContext.bindTexture(gl, this._glTextureType, null);
 	}
 
 	/**
+	 * 设置循环模式
 	 * @internal
 	 */
 	protected _setWarpMode(orientation: number, mode: number): void {
@@ -277,13 +377,17 @@ export class BaseTexture extends Bitmap {
 				case WarpMode.Clamp:
 					gl.texParameteri(this._glTextureType, orientation, gl.CLAMP_TO_EDGE);
 					break;
+				case WarpMode.Mirrored:
+					gl.texParameteri(this._glTextureType, orientation, gl.MIRRORED_REPEAT);
 			}
 		} else {
 			gl.texParameteri(this._glTextureType, orientation, gl.CLAMP_TO_EDGE);
 		}
+		WebGLContext.bindTexture(gl, this._glTextureType, null);
 	}
 
 	/**
+	 * 设置各向异性等级
 	 * @internal
 	 */
 	protected _setAnisotropy(value: number): void {
@@ -294,10 +398,12 @@ export class BaseTexture extends Bitmap {
 			WebGLContext.bindTexture(gl, this._glTextureType, this._glTexture);
 			value = Math.min(gl.getParameter(anisotropic.MAX_TEXTURE_MAX_ANISOTROPY_EXT), value);
 			gl.texParameterf(this._glTextureType, anisotropic.TEXTURE_MAX_ANISOTROPY_EXT, value);
+			WebGLContext.bindTexture(gl, this._glTextureType, null);
 		}
 	}
 
 	/**
+	 * 处理资源
 	 * @inheritDoc
 	 * @override
 	 */

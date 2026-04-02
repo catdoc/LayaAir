@@ -12,7 +12,9 @@ import { Button } from "laya/ui/Button";
 import { Browser } from "laya/utils/Browser";
 import { Handler } from "laya/utils/Handler";
 import { Stat } from "laya/utils/Stat";
+import { Utils } from "laya/utils/Utils";
 import { Laya3D } from "Laya3D";
+import Client from "../../Client";
 import { CameraMoveScript } from "../common/CameraMoveScript";
 
 /**
@@ -26,6 +28,11 @@ export class MaterialDemo {
 	private billinMaterial: BlinnPhongMaterial;
 	private changeActionButton: Button;
 	private index: number = 0;
+
+	/**实例类型*/
+	private btype:any = "MaterialDemo";
+	/**场景内按钮类型*/
+	private stype:any = 0;
 
 	constructor() {
 		//初始化引擎
@@ -59,7 +66,6 @@ export class MaterialDemo {
 		this.pbrStandardMaterial.albedoTexture = this.pbrTexture;
 		//加载UI
 		this.loadUI();
-
 	}
 
 	private loadUI(): void {
@@ -74,20 +80,22 @@ export class MaterialDemo {
 			this.changeActionButton.scale(Browser.pixelRatio, Browser.pixelRatio);
 			this.changeActionButton.pos(Laya.stage.width / 2 - this.changeActionButton.width * Browser.pixelRatio / 2, Laya.stage.height - 100 * Browser.pixelRatio);
 
-			this.changeActionButton.on(Event.CLICK, this, function (): void {
-				this.index++;
-				if (this.index % 2 === 1) {
-					//切换至PBRStandard材质
-					this.sphere.meshRenderer.material = this.pbrStandardMaterial;
-				} else {
-					//切换至BlinnPhong材质
-					this.sphere.meshRenderer.material = this.billinMaterial;
-				}
-			});
-
+			this.changeActionButton.on(Event.CLICK, this, this.stypeFun0);
 		}));
 	}
 
+	stypeFun0(index:number = 0): void {
+		this.index++;
+		if (this.index % 2 === 1) {
+			//切换至PBRStandard材质
+			this.sphere.meshRenderer.material = this.pbrStandardMaterial;
+		} else {
+			//切换至BlinnPhong材质
+			this.sphere.meshRenderer.material = this.billinMaterial;
+		}
+		index = this.index;
+		Client.instance.send({type:"next",btype:this.btype,stype:0,value:index});		
+	}
 }
 
 

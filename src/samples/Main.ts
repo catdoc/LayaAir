@@ -1,17 +1,17 @@
-import { ILaya } from "ILaya";
+
 import { Laya } from "Laya";
 import { Sprite } from "laya/display/Sprite";
 import { Stage } from "laya/display/Stage";
 import { Loader } from "laya/net/Loader";
 import { URL } from "laya/net/URL";
-//import laya.qg.mini.QGMiniAdapter;
 import { Handler } from "laya/utils/Handler";
 import { Stat } from "laya/utils/Stat";
 import { Laya3D } from "Laya3D";
 import { IndexView2D } from "./view/IndexView2D";
 import { IndexView3D } from "./view/IndexView3D";
-import { Texture } from "../../bin/tsc/layaAir/laya/resource/Texture";
-import { Texture2D } from "../../bin/tsc/layaAir/laya/resource/Texture2D";
+import { Texture } from "laya/resource/Texture";
+import { Texture2D } from 'laya/resource/Texture2D';
+import Client from "./Client";
 
 export class Main {
     private static _box3D: Sprite;
@@ -34,12 +34,10 @@ export class Main {
     private _isType: boolean = false;
     static isWXAPP: boolean = false;
     private _isReadNetWorkRes: boolean = true;
-    constructor() {
-
-        //QGMiniAdapter.init();
+    static isOpenSocket:boolean = false;
+    constructor(isType:boolean = true,isReadNetWorkRes:boolean = false) {
         //false为2D true为3D
-        console.log("oppen testBrowser");
-        this._isType = (window as any).isType || true;
+        this._isType = isType;
         if (!this._isType) {
             Laya.init(1280, 720);
             Laya.stage.scaleMode = Stage.SCALE_FIXED_AUTO;
@@ -49,21 +47,27 @@ export class Main {
             Laya.stage.screenMode = Stage.SCREEN_NONE;
         }
         Laya.stage.bgColor = "#ffffff";
-        //Laya.stage.bgColor = "#c1c1c1c";
         Stat.show();
 
+        //初始化socket连接
+        if(Main.isOpenSocket)
+            Client.init();
+
         //这里改成true就会从外部加载资源
-        this._isReadNetWorkRes = (window as any).isReadNetWorkRes || false;
-        if (this._isReadNetWorkRes || ILaya.Browser.onVVMiniGame || ILaya.Browser.onBDMiniGame || ILaya.Browser.onMiniGame) {
-            URL.rootPath = URL.basePath = "http://10.10.20.55:8000/";//"https://star.layabox.com/Laya1.0.0/";//"http://10.10.20.55:8000/";//"https://layaair.ldc.layabox.com/demo2/h5/";
+        this._isReadNetWorkRes = isReadNetWorkRes;
+        if (this._isReadNetWorkRes) {
+            URL.rootPath = URL.basePath ="https://layaair2.ldc2.layabox.com/demo2/h5/";/*"http://10.10.20.55:8000/";*///"https://star.layabox.com/Laya1.0.0/";//"http://10.10.20.55:8000/";"https://layaair.ldc.layabox.com/demo2/h5/";
         }
         //加载引擎需要的资源
         Laya.loader.load([{ url: "res/atlas/comp.json", type: Loader.ATLAS }], Handler.create(this, this.onLoaded));
     }
 
     private onLoaded(): void {
-        let txture: Texture = Laya.loader.getRes("comp/button.png");
-        (txture.bitmap as Texture2D).lock = true;
+        if(Main.isOpenSocket)
+            Client.instance.send({type:"login"});
+
+        let texture: Texture = Laya.loader.getRes("comp/button.png");
+        (texture.bitmap as Texture2D).lock = true;
         if (!this._isType) {
             //Layaair1.0-2d
             Main.box2D = new Sprite();

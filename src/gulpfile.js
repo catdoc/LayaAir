@@ -11,7 +11,9 @@ const rollup = require('rollup');
 var through = require('through2');
 //合并文件
 var concat = require('gulp-concat'),pump = require('pump');
-
+const uglify = require('gulp-uglify-es').default;
+const rename = require('gulp-rename');
+var Stream = require('stream');
 
 //编译新的库文件只需要在packsDef中配置一下新的库就可以了
 var packsDef = [
@@ -42,12 +44,50 @@ var packsDef = [
     {
         'libName': "d3",
         'input': [
-            './layaAir/laya/d3/**/*.*',
+            './layaAir/laya/d3/animation/**/*.*',
+            './layaAir/laya/d3/component/**/*.*',
+            './layaAir/laya/d3/depthMap/*.*',
+            './layaAir/laya/d3/core/**/*.*',
+            './layaAir/laya/d3/graphics/**/*.*',
+            './layaAir/laya/d3/loaders/**/*.*',
+            './layaAir/laya/d3/math/**/*.*',
+            './layaAir/laya/d3/shader/**/*.*',
+            './layaAir/laya/d3/shadowMap/**/*.*',
+            './layaAir/laya/d3/text/**/*.*',
+            './layaAir/laya/d3/utils/**/*.*',
+            './layaAir/laya/d3/CastShadowList.ts',
+            './layaAir/laya/d3/Input3D.ts',
+            './layaAir/laya/d3/MouseTouch.ts',
+            './layaAir/laya/d3/Touch.ts',
+            './layaAir/laya/d3/resource/**/*.*',
             './layaAir/Config3D.ts',
+            './layaAir/laya/d3/Physics3D.ts',
             './layaAir/ILaya3D.ts',
-            './layaAir/Laya3D.ts'
+            './layaAir/Laya3D.ts',
+            './layaAir/laya/d3/WebXR/**/*.*'
         ],
         'out': '../build/js/libs/laya.d3.js'
+    },
+    {
+        'libName': "gltf",
+        'input': [
+            './layaAir/laya/gltf/**/*.*',
+        ],
+        'out': '../build/js/libs/laya.gltf.js'
+    },
+    {
+        'libName': "cannonPhysics",
+        'input': [
+            './layaAir/laya/d3/physicsCannon/**/*.*',
+        ],
+        'out': '../build/js/libs/laya.cannonPhysics.js'
+    },
+    {
+        'libName': "BulletPhysics",
+        'input':[
+            './layaAir/laya/d3/physics/**/*.*',
+        ],
+        'out':'../build/js/libs/laya.bullet.js'
     },
     {
         'libName': 'device',
@@ -94,6 +134,13 @@ var packsDef = [
         'out': '../build/js/libs/laya.ui.js'
     },
     {
+        'libName': 'spine',
+        'input': [
+            './layaAir/laya/spine/**/*.*'
+        ],
+        'out': '../build/js/libs/laya.spine.js'
+    },
+    {
         'libName': 'ani',
         'input': [
             './layaAir/laya/ani/**/*.*'
@@ -106,6 +153,13 @@ var packsDef = [
             './extensions/debug/**/*.*'
         ],
         'out': '../build/js/libs/laya.debugtool.js'
+    },
+    {
+        "libName": 'perforManceTool',
+        'input':[
+            './extensions/performanceTool/**/*.*'
+        ],
+        'out':'../build/js/libs/laya.performancetool.js'
     }
 ];
 
@@ -233,10 +287,72 @@ gulp.task('ConcatBox2dPhysics', function (cb) {
     ], cb);
 });
 
+//合并 cannon.js 和 laya.cannonPhysics.js
+gulp.task('ConcatCannonPhysics', function (cb) {
+    pump([
+        gulp.src([
+            './layaAir/jsLibs/cannon.js',
+            '../build/js/libs/laya.cannonPhysics.js']),
+        concat('laya.cannonPhysics.js'),//合并后的文件名
+        gulp.dest('../build/js/libs/'),
+    ], cb);
+});
+
+//合并 laya.bullet.js 和 laya.physics3D.wasm.js
+gulp.task('ConcatBulletPhysics.wasm', function (cb) {
+    pump([
+        gulp.src([
+            './layaAir/jsLibs/laya.physics3D.wasm.js',
+            '../build/js/libs/laya.bullet.js']),
+        concat('laya.physics3D.wasm.js'),//合并后的文件名
+        gulp.dest('../build/js/libs/'),
+    ], function() {   
+        cb();
+    });
+}); 
+//合并 laya.bullet.js 和 laya.physics3D.wasm-wx.js
+gulp.task('ConcatBulletPhysics.wasm-wx', function (cb) {
+    pump([
+        gulp.src([
+            './layaAir/jsLibs/laya.physics3D.wasm-wx.js',
+            '../build/js/libs/laya.bullet.js']),
+        concat('laya.physics3D.wasm-wx.js'),//合并后的文件名
+        gulp.dest('../build/js/libs/'),
+    ], function() {   
+        cb();
+    });
+});
+//合并 laya.bullet.js 和 laya.physics3D.wasm-alipay.js   支付宝wasm物理库适配
+gulp.task('ConcatBulletPhysics.wasm-alipay', function (cb) {
+    pump([
+        gulp.src([
+            './layaAir/jsLibs/laya.physics3D.wasm-alipay.js',
+            '../build/js/libs/laya.bullet.js']),
+        concat('laya.physics3D.wasm-alipay.js'),//合并后的文件名
+        gulp.dest('../build/js/libs/'),
+    ], function() {   
+        cb();
+    });
+});
+//合并 laya.bullet.js 和 laya.physics3D.js
+gulp.task('ConcatBulletPhysics', function (cb) {
+    pump([
+        gulp.src([
+            './layaAir/jsLibs/laya.physics3D.js',
+            '../build/js/libs/laya.bullet.js']),
+        concat('laya.physics3D.js'),//合并后的文件名
+        gulp.dest('../build/js/libs/'),
+    ], function() { // 因为不符合pump的规则，需要将bullet删掉
+        fs.unlinkSync('../build/js/libs/laya.bullet.js');
+        cb();
+    });
+});
+
 //拷贝引擎的第三方js库
 gulp.task('CopyJSLibsToJS', () => {
     return gulp.src([
-        './layaAir/jsLibs/laya.physics3D.wasm.wasm','./layaAir/jsLibs/*.js', '!./layaAir/jsLibs/box2d.js', '!./layaAir/jsLibs/laya.physics.js'])
+        './layaAir/jsLibs/laya.physics3D.wasm.wasm','./layaAir/jsLibs/*.js',
+        '!./layaAir/jsLibs/{box2d.js,cannon.js,laya.physics3D.js,laya.physics3D.wasm.js,laya.physics3D.wasm-wx.js,laya.physics3D.wasm-alipay.js}'])
         .pipe(gulp.dest('../build/js/libs'));
 });
 
@@ -293,6 +409,7 @@ gulp.task('buildJS', async function () {
             plugins: [
                 myMultiInput(),
                 typescript({
+                    include: /.*(.d.ts|.ts|.js)$/,
                     tsconfig: "./layaAir/tsconfig.json",
                     check: false,
                     tsconfigOverride: { compilerOptions: { removeComments: true } }
@@ -303,6 +420,8 @@ gulp.task('buildJS', async function () {
                     compress: false
                 }),
             ]
+        }).catch(e => {
+            console.log(e);
         });
 
         if (packsDef[i].libName == "core") {
@@ -327,5 +446,100 @@ gulp.task('buildJS', async function () {
         }
     }
 });
+// 修改laya.physics3D.wasm-wx.js 里的路径
+function changeWxWasmPath() {
+    var stream = new Stream.Transform({ objectMode: true });
+    stream._transform = function (originalFile, unused, callback) {
+        let fPath = originalFile.path;
+        if (fPath.indexOf('laya.physics3D.wasm-wx.js') >= 0) {
+            var stringData = String(originalFile.contents); 
+            stringData = stringData.replace('libs/laya.physics3D.wasm.wasm', 'libs/min/laya.physics3D.wasm.wasm');
+            var file = originalFile.clone({ contents: false });
+            var finalBinaryData = Buffer.from(stringData);
+            file.contents = finalBinaryData;
+            callback(null, file);
+        } else {
+            callback(null, originalFile);
+        } 
+    }; 
+    return stream;
+}
+// 修改laya.physics3D.wasm-alipay.js 里的路径
+function changeAliPayWasmPath() {
+    var stream = new Stream.Transform({ objectMode: true });
+    stream._transform = function (originalFile, unused, callback) {
+        let fPath = originalFile.path;
+        if (fPath.indexOf('laya.physics3D.wasm-alipay.js') >= 0) {
+            var stringData = String(originalFile.contents); 
+            stringData = stringData.replace('libs/laya.physics3D.wasm.wasm', 'libs/min/laya.physics3D.wasm.wasm');
+            var file = originalFile.clone({ contents: false });
+            var finalBinaryData = Buffer.from(stringData);
+            file.contents = finalBinaryData;
+            callback(null, file);
+        } else {
+            callback(null, originalFile);
+        } 
+    }; 
+    return stream;
+}
+// 压缩
+// 下面两个方法，最好能合并
+gulp.task("compressJs", function () {
+    gulp.src("../build/as/jslibs/laya.physics3D.js")
+        .pipe(rename({extname: ".min.js"}))
+        .pipe(gulp.dest("../build/as/jslibs/min"))
+        .pipe(gulp.dest("../build/js/libs/min"))
+        .pipe(gulp.dest("../build/ts/libs/min"));
 
-gulp.task('build', gulp.series('buildJS', 'ModifierJs', 'ConcatBox2dPhysics', 'CopyJSLibsToJS', 'CopyTSFileToTS', 'CopyJSFileToAS', 'CopyTSJSLibsFileToTS', 'CopyJSFileToTSCompatible', 'CopyDTS'));
+    gulp.src("../build/as/jslibs/laya.physics3D.wasm.wasm")
+        .pipe(gulp.dest("../build/as/jslibs/min"))
+        .pipe(gulp.dest("../build/js/libs/min"))
+        .pipe(gulp.dest("../build/ts/libs/min"));
+
+    return gulp.src(["../build/as/jslibs/*.js", "!../build/as/jslibs/{laya.physics3D.js}"])
+        .pipe(uglify({
+            mangle: {
+                keep_fnames: true
+            }
+        }))
+        .on('error', function (err) {
+            console.warn(err.toString());
+        })
+        .pipe(changeWxWasmPath()) 
+        .pipe(changeAliPayWasmPath()) 
+        .pipe(rename({extname: ".min.js"}))
+        .pipe(gulp.dest("../build/as/jslibs/min"))
+        .pipe(gulp.dest("../build/js/libs/min"))
+        .pipe(gulp.dest("../build/ts/libs/min"));
+});
+
+gulp.task("compresstsnewJs", function () {
+    gulp.src("../build/ts_new/jslibs/laya.physics3D.js")
+        .pipe(rename({extname: ".min.js"}))
+        .pipe(gulp.dest("../build/ts_new/jslibs/min"));
+
+    gulp.src("../build/ts_new/jslibs/laya.physics3D.wasm.wasm")
+        .pipe(gulp.dest("../build/ts_new/jslibs/min"));
+
+    return gulp.src(["../build/ts_new/jslibs/*.js", "!../build/ts_new/jslibs/laya.physics3D.js"])
+        .pipe(uglify({
+            mangle: {
+                keep_fnames: true
+            }
+        }))
+        .on('error', function (err) {
+            console.warn(err.toString());
+        })
+        .pipe(changeWxWasmPath()) 
+        .pipe(changeAliPayWasmPath()) 
+        .pipe(rename({extname: ".min.js"}))
+        .pipe(gulp.dest("../build/ts_new/jslibs/min"));
+});
+
+gulp.task('build', 
+gulp.series('buildJS', 'ModifierJs', 'ConcatBox2dPhysics', 
+            'ConcatCannonPhysics','ConcatBulletPhysics.wasm', 'ConcatBulletPhysics.wasm-wx', 'ConcatBulletPhysics.wasm-alipay',  
+            'ConcatBulletPhysics', 'CopyJSLibsToJS', 
+            'CopyTSFileToTS', 'CopyJSFileToAS', 
+            'CopyTSJSLibsFileToTS', 'CopyJSFileToTSCompatible', 
+            'CopyDTS', 'compressJs', 'compresstsnewJs'));

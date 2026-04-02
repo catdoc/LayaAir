@@ -1,3 +1,4 @@
+//@ts-nocheck
 import { RenderElement } from "./RenderElement";
 import { RenderContext3D } from "./RenderContext3D";
 import { Bounds } from "../Bounds"
@@ -8,19 +9,18 @@ import { Material } from "../material/Material"
 import { BoundsOctreeNode } from "../scene/BoundsOctreeNode"
 import { IOctreeObject } from "../scene/IOctreeObject"
 import { Scene3D } from "../scene/Scene3D"
-import { FrustumCulling } from "../../graphics/FrustumCulling"
 import { BoundFrustum } from "../../math/BoundFrustum"
 import { Vector3 } from "../../math/Vector3"
 import { Vector4 } from "../../math/Vector4"
 import { ShaderData } from "../../shader/ShaderData"
 import { Event } from "../../../events/Event"
 import { EventDispatcher } from "../../../events/EventDispatcher"
-import { Render } from "../../../renders/Render"
 import { ISingletonElement } from "../../../resource/ISingletonElement"
-import { Texture2D } from "../../../resource/Texture2D"
 import { MeshRenderStaticBatchManager } from "../../graphics/MeshRenderStaticBatchManager";
 import { Stat } from "../../../utils/Stat";
 import { Lightmap } from "../scene/Lightmap";
+import { ReflectionProbe, ReflectionProbeMode } from "../reflectionProbe/ReflectionProbe";
+import { IRenderNodeObject } from "../scene/SceneRenderManager/IRenderNodeObject";
 
 /**
  * <code>Render</code> 类用于渲染器的父类，抽象类不允许实例。
@@ -71,18 +71,26 @@ export class BaseRender extends EventDispatcher implements ISingletonElement, IO
 	_scene: Scene3D;
 	/** @internal */
 	_owner: RenderableSprite3D;
-	/** @internal */
+
 	_renderElements: RenderElement[];
 	/** @internal */
 	_distanceForSort: number;
 	/** @internal */
 	_renderMark: number = -1;//TODO:初始值为-1强制更新,否则会造成第一帧动画不更新等,待优化
 	/** @internal */
-	_octreeNode: BoundsOctreeNode;
+	_octreeNode: IRenderNodeObject;
 	/** @internal */
 	_indexInOctreeMotionList: number = -1;
+	/** @internal 是否需要反射探针*/
+	_probReflection: ReflectionProbe;
+	/** @internal 材质是否支持反射探针*/
+	_surportReflectionProbe: boolean;
+	/** @internal 设置是反射探针模式 off  simple */
+	_reflectionMode: number = ReflectionProbeMode.simple;
 
 	/** @internal */
+	_sceneUpdateMark: number = -1;
+	/** @internal 属于相机的标记*/
 	_updateMark: number = -1;
 	/** @internal */
 	_updateRenderType: number = -1;
@@ -97,12 +105,29 @@ export class BaseRender extends EventDispatcher implements ISingletonElement, IO
 	/**@internal	[NATIVE]*/
 	_cullingBufferIndex: number;
 
+	/**@internal 可以根据不同的值来设置*/
+	_ratioIgnor: number = 0.005;
+
 	/**
 	 * 获取唯一标识ID,通常用于识别。
 	 */
 	get id(): number {
 		return this._id;
 	}
+
+	/**
+	 * DistanceVolumCull
+	 * 根据距离和包围盒进行裁剪，越大越容易被裁
+	 */
+	set ratioIgnor(value: number) {
+		this._ratioIgnor = value;
+	}
+
+	get ratioIgnor(): number {
+		return this._ratioIgnor;
+	}
+
+
 
 	/**
 	 * 光照贴图的索引。
@@ -155,6 +180,7 @@ export class BaseRender extends EventDispatcher implements ISingletonElement, IO
 
 	set material(value: Material) {
 		this.sharedMaterial = value;
+		this._isSupportReflection();
 	}
 
 	/**
@@ -173,6 +199,7 @@ export class BaseRender extends EventDispatcher implements ISingletonElement, IO
 
 	set materials(value: Material[]) {
 		this.sharedMaterials = value;
+		this._isSupportReflection();
 	}
 
 	/**
@@ -191,6 +218,7 @@ export class BaseRender extends EventDispatcher implements ISingletonElement, IO
 			var renderElement: RenderElement = this._renderElements[0];
 			(renderElement) && (renderElement.material = value);
 		}
+		this._isSupportReflection();
 	}
 
 	/**
@@ -229,6 +257,7 @@ export class BaseRender extends EventDispatcher implements ISingletonElement, IO
 		} else {
 			throw new Error("BaseRender: shadredMaterials value can't be null.");
 		}
+		this._isSupportReflection();
 	}
 
 	/**
@@ -284,6 +313,14 @@ export class BaseRender extends EventDispatcher implements ISingletonElement, IO
 		return this._renderMark == -1 || this._renderMark == (Stat.loopCount - 1);
 	}
 
+	set reflectionMode(value: ReflectionProbeMode) {
+		this._reflectionMode = value;
+	}
+
+	get reflectionMode(): ReflectionProbeMode {
+		return this._reflectionMode;
+	}
+
 	/**
 	 * @internal
 	 * 创建一个新的 <code>BaseRender</code> 实例。
@@ -293,19 +330,6 @@ export class BaseRender extends EventDispatcher implements ISingletonElement, IO
 		this._id = ++BaseRender._uniqueIDCounter;
 		this._indexInCastShadowList = -1;
 		this._bounds = new Bounds(Vector3._ZERO, Vector3._ZERO);
-		if (Render.supportWebGLPlusCulling) {//[NATIVE]
-			var length: number = FrustumCulling._cullingBufferLength;
-			this._cullingBufferIndex = length;
-			var cullingBuffer: Float32Array = FrustumCulling._cullingBuffer;
-			var resizeLength: number = length + 7;
-			if (resizeLength >= cullingBuffer.length) {
-				var temp: Float32Array = cullingBuffer;
-				cullingBuffer = FrustumCulling._cullingBuffer = new Float32Array(cullingBuffer.length + 4096);
-				cullingBuffer.set(temp, 0);
-			}
-			cullingBuffer[length] = 2;
-			FrustumCulling._cullingBufferLength = resizeLength;
-		}
 
 		this._renderElements = [];
 		this._owner = owner;
@@ -329,7 +353,11 @@ export class BaseRender extends EventDispatcher implements ISingletonElement, IO
 	 * 
 	 */
 	_setOctreeNode(value: BoundsOctreeNode): void {//[实现IOctreeObject接口]
+		if (!value) {
+			(this._indexInOctreeMotionList !== -1) && (this._octreeNode.getManagerNode().removeMotionObject(this));
+		}
 		this._octreeNode = value;
+
 	}
 
 	/**
@@ -369,6 +397,29 @@ export class BaseRender extends EventDispatcher implements ISingletonElement, IO
 	/**
 	 * @internal
 	 */
+	private _isSupportReflection() {
+		this._surportReflectionProbe = false;
+		var sharedMats: Material[] = this._sharedMaterials;
+		for (var i: number = 0, n: number = sharedMats.length; i < n; i++) {
+			var mat: Material = sharedMats[i];
+			this._surportReflectionProbe = (this._surportReflectionProbe || (mat && mat._shader._supportReflectionProbe));//TODO：最后一个判断是否合理
+		}
+	}
+
+	/**
+	 * 渲染器添加到更新反射探针队列
+	 * @internal
+	 */
+	_addReflectionProbeUpdate() {
+		//TODO目前暂时不支持混合以及与天空盒模式，只支持simple和off
+		if (this._surportReflectionProbe && this._reflectionMode == 1) {
+			this._scene && this._scene._reflectionProbeManager.addMotionObject(this);
+		}
+	}
+
+	/**
+	 * @internal
+	 */
 	_applyLightMapParams(): void {
 		var lightMaps: Lightmap[] = this._scene.lightmaps;
 		var shaderValues: ShaderData = this._shaderValues;
@@ -399,10 +450,15 @@ export class BaseRender extends EventDispatcher implements ISingletonElement, IO
 			flag &= Transform3D.TRANSFORM_WORLDPOSITION | Transform3D.TRANSFORM_WORLDQUATERNION | Transform3D.TRANSFORM_WORLDSCALE;//过滤有用TRANSFORM标记
 			if (flag) {
 				if (this._indexInOctreeMotionList === -1)//_octreeNode表示在八叉树队列中
-					this._octreeNode._octree.addMotionObject(this);
+					this._octreeNode.getManagerNode().addMotionObject(this);
 			}
 		}
+		this._addReflectionProbeUpdate();
+
 	}
+
+
+
 
 	/**
 	 * @internal
@@ -432,12 +488,23 @@ export class BaseRender extends EventDispatcher implements ISingletonElement, IO
 		this._scene = scene;
 	}
 
+	_setUnBelongScene() {
+		this._scene = null;
+	}
+
 	/**
 	 * @internal
 	 * @param boundFrustum 如果boundFrustum为空则为摄像机不裁剪模式。
 	 */
 	_needRender(boundFrustum: BoundFrustum, context: RenderContext3D): boolean {
 		return true;
+	}
+
+	/**
+	 * @internal
+	 * 八叉树节点不需要渲染调用的事件 
+	 */
+	_OctreeNoRender(): void {
 	}
 
 	/**
@@ -462,19 +529,19 @@ export class BaseRender extends EventDispatcher implements ISingletonElement, IO
 	 * @internal
 	 */
 	_destroy(): void {
-		(this._indexInOctreeMotionList !== -1) && (this._octreeNode._octree.removeMotionObject(this));
+		(this._indexInOctreeMotionList !== -1) && (this._octreeNode.getManagerNode().removeMotionObject(this));
 		this.offAll();
 		var i: number = 0, n: number = 0;
 		for (i = 0, n = this._renderElements.length; i < n; i++)
 			this._renderElements[i].destroy();
 		for (i = 0, n = this._sharedMaterials.length; i < n; i++)
 			(this._sharedMaterials[i].destroyed) || (this._sharedMaterials[i]._removeReference());//TODO:材质可能为空
-
 		this._renderElements = null;
 		this._owner = null;
 		this._sharedMaterials = null;
 		this._bounds = null;
 		this._lightmapScaleOffset = null;
+		this._scene = null;
 	}
 
 	/**
@@ -485,7 +552,6 @@ export class BaseRender extends EventDispatcher implements ISingletonElement, IO
 			MeshRenderStaticBatchManager.instance._removeRenderSprite(this._owner);
 			this._isPartOfStaticBatch = false;
 		}
-
 	}
 }
 

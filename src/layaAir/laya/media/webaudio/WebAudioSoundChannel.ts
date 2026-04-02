@@ -68,7 +68,7 @@ export class WebAudioSoundChannel extends SoundChannel {
         this.isStopped = false;
         this._clearBufferSource();
         if (!this.audioBuffer) return;
-        if (this.startTime >= this.duration) return stop();
+        if (this.startTime >= this.duration) return this.stop();
         var context: any = this.context;
         var gain: any = this.gain;
         var bufferSource: any = context.createBufferSource();
@@ -152,15 +152,11 @@ export class WebAudioSoundChannel extends SoundChannel {
     }
 
     private _tryClearBuffer(sourceNode: any): void {
-        if (!Browser.onMac) {
-            try {
-                sourceNode.buffer = null;
-            } catch (e) {
-                WebAudioSoundChannel._tryCleanFailed = true;
-            }
-            return;
+        try {//已经支持buffer=null
+            sourceNode.buffer = null;
+        } catch (e) {
+            WebAudioSoundChannel._tryCleanFailed = true;
         }
-        try { sourceNode.buffer = ILaya.WebAudioSound._miniBuffer; } catch (e) { WebAudioSoundChannel._tryCleanFailed = true; }
     }
 
     /**

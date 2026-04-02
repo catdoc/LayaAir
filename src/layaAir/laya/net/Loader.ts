@@ -5,7 +5,6 @@ import { Event } from "../events/Event";
 import { EventDispatcher } from "../events/EventDispatcher";
 import { Sound } from "../media/Sound";
 import { SoundManager } from "../media/SoundManager";
-import { BaseTexture } from "../resource/BaseTexture";
 import { Texture } from "../resource/Texture";
 import { Texture2D } from "../resource/Texture2D";
 import { Browser } from "../utils/Browser";
@@ -83,7 +82,7 @@ export class Loader extends EventDispatcher {
 	static TERRAINRES = "TERRAIN";
 
 	/**文件后缀和类型对应表。*/
-	static typeMap: { [key: string]: string } = { "ttf": "ttf", "png": "image", "jpg": "image", "jpeg": "image", "ktx": "image", "pvr": "image", "txt": "text", "json": "json", "prefab": "prefab", "xml": "xml", "als": "atlas", "atlas": "atlas", "mp3": "sound", "ogg": "sound", "wav": "sound", "part": "json", "fnt": "font", "plf": "plf", "plfb": "plfb", "scene": "json", "ani": "json", "sk": "arraybuffer" };
+	static typeMap: { [key: string]: string } = { "ttf": "ttf", "png": "image", "jpg": "image", "jpeg": "image", "ktx": "image", "pvr": "image", "txt": "text", "json": "json", "prefab": "prefab", "xml": "xml", "als": "atlas", "atlas": "atlas", "mp3": "sound", "ogg": "sound", "wav": "sound", "part": "json", "fnt": "font", "plf": "plf", "plfb": "plfb", "scene": "json", "ani": "json", "sk": "arraybuffer", "wasm": "arraybuffer" };
 	/**资源解析函数对应表，用来扩展更多类型的资源加载解析。*/
 	static parserMap: any = {};
 	/**每帧加载完成回调使用的最大超时时间，如果超时，则下帧再处理，防止帧卡顿。*/
@@ -139,7 +138,8 @@ export class Loader extends EventDispatcher {
 	_propertyParams: any;
 	/**@internal */
 	_createCache: boolean;
-
+	/**@internal 原始加载类型 */
+	_originType: string;
 
 	/**
 	 * 加载资源。加载错误会派发 Event.ERROR 事件，参数为错误信息。
@@ -158,7 +158,7 @@ export class Loader extends EventDispatcher {
 
 		Loader.setGroup(url, "666");
 		this._url = url;
-		if (url.indexOf("data:image") === 0) type = Loader.IMAGE;
+		if (url.indexOf("data:image") === 0 && !type) type = Loader.IMAGE;
 		else url = URL.formatURL(url);
 		this._type = type || (type = Loader.getTypeFromUrl(this._url));
 		this._cache = cache;
@@ -168,8 +168,12 @@ export class Loader extends EventDispatcher {
 			ILaya.WorkerLoader.enableWorkerLoader();
 
 		var cacheRes: any;
-		if (type == Loader.IMAGE)
+		if (type == Loader.IMAGE) {
 			cacheRes = Loader.textureMap[url];
+			if (cacheRes && (!(cacheRes as Texture).bitmap || ((cacheRes as Texture).bitmap && (cacheRes as Texture).bitmap.destroyed))) {
+				cacheRes = null;
+			}
+		}
 		else
 			cacheRes = Loader.loadedMap[url];
 		if (!ignoreCache && cacheRes) {
@@ -236,7 +240,7 @@ export class Loader extends EventDispatcher {
 	 * onload、onprocess、onerror必须写在本类
 	 */
 	private _loadHttpRequest(url: string, contentType: string, onLoadCaller: Object, onLoad: Function | null, onProcessCaller: any, onProcess: Function | null, onErrorCaller: any, onError: Function): void {
-		if (Browser.onVVMiniGame) {
+		if (Browser.onVVMiniGame || Browser.onHWMiniGame) {
 			this._http = new HttpRequest();//临时修复vivo复用xmlhttprequest的bug
 		} else {
 			if (!this._http)
@@ -301,9 +305,9 @@ export class Loader extends EventDispatcher {
 	/**
 	 * @private
 	 */
-	protected _loadImage(url: string,isformatURL:boolean = true): void {
+	protected _loadImage(url: string, isformatURL: boolean = true): void {
 		var _this = this;
-		if(isformatURL)
+		if (isformatURL)
 			url = URL.formatURL(url);
 		var onError: Function = function (): void {
 			_this.event(Event.ERROR, "Load image failed");
@@ -311,9 +315,12 @@ export class Loader extends EventDispatcher {
 		if (this._type === "nativeimage") {
 			this._loadHtmlImage(url, this, this.onLoaded, this, onError);
 		} else {
-			
-			 var ext: string = Utils.getFileExtension(url);
-			 if (ext === "ktx" || ext === "pvr") 
+
+			var ext: string = Utils.getFileExtension(url);
+			if (ext == 'bin' && this._url) {
+				ext = Utils.getFileExtension(this._url);
+			}
+			if (ext === "ktx" || ext === "pvr")
 				this._loadHttpRequest(url, Loader.BUFFER, this, this.onLoaded, this, this.onProgress, this, this.onError);
 			else
 				this._loadHtmlImage(url, this, this.onLoaded, this, onError);
@@ -350,6 +357,7 @@ export class Loader extends EventDispatcher {
 	/**@private */
 	protected onProgress(value: number): void {
 		if (this._type === Loader.ATLAS) this.event(Event.PROGRESS, value * 0.3);
+		else if (this._originType == Loader.HIERARCHY) this.event(Event.PROGRESS, value / 3);
 		else this.event(Event.PROGRESS, value);
 	}
 
@@ -371,7 +379,7 @@ export class Loader extends EventDispatcher {
 			this.parsePLFData(data);
 			this.complete(data);
 		} else if (type === Loader.IMAGE) {
-			let tex:Texture2D;
+			let tex: Texture2D;
 			//可能有另外一种情况
 			if (data instanceof ArrayBuffer) {
 				var ext: string = Utils.getFileExtension(this._url);
@@ -393,22 +401,22 @@ export class Loader extends EventDispatcher {
 				tex.wrapModeV = WarpMode.Clamp;
 				tex.setCompressData(data);
 				tex._setCreateURL(this.url);
-			} else if(!(data instanceof Texture2D)){
+			} else if (!(data instanceof Texture2D)) {
 				tex = new Texture2D(data.width, data.height, 1, false, false);
 				tex.wrapModeU = WarpMode.Clamp;
 				tex.wrapModeV = WarpMode.Clamp;
 				tex.loadImageSource(data, true);
 				tex._setCreateURL(data.src);
-			}else{
+			} else {
 				tex = data;
 			}
 			var texture: Texture = new Texture(tex);
 			texture.url = this._url;
 			this.complete(texture);
-		
+
 		} else if (type === Loader.SOUND || type === "nativeimage") {
 			this.complete(data);
-		} else if(type === "htmlimage" ){
+		} else if (type === "htmlimage") {
 			let tex: Texture2D = new Texture2D(data.width, data.height, 1, false, false);
 			tex.wrapModeU = WarpMode.Clamp;
 			tex.wrapModeV = WarpMode.Clamp;
@@ -416,7 +424,7 @@ export class Loader extends EventDispatcher {
 			tex._setCreateURL(data.src);
 			this.complete(tex);
 		}
-		 else if (type === Loader.ATLAS) {
+		else if (type === Loader.ATLAS) {
 			//处理图集
 			if (data.frames) {
 				var toloadPics: string[] = [];
@@ -436,7 +444,11 @@ export class Loader extends EventDispatcher {
 							changeType = ".ktx";
 						}
 						if (Browser.onIOS && data.meta.compressTextureIOS) {
-							changeType = ".pvr";
+							if (data.meta.astc) {
+								changeType = ".ktx";
+							} else {
+								changeType = ".pvr";
+							}
 						}
 						//idx = _url.indexOf("?");
 						//var ver:String;
@@ -460,22 +472,58 @@ export class Loader extends EventDispatcher {
 					data.pics = [];
 				}
 				this.event(Event.PROGRESS, 0.3 + 1 / toloadPics.length * 0.6);
-				return this._loadResourceFilter(Loader.IMAGE, toloadPics.pop() as string);
+				var url = URL.formatURL(toloadPics.pop());
+				var ext = Utils.getFileExtension(url);
+				var type = Loader.IMAGE;
+				if (ext == "pvr" || ext == "ktx") {
+					type = Loader.BUFFER;
+				}
+				return this._loadResourceFilter(type, url);
 			} else {
-				if(!(data instanceof Texture2D))
-				{
-					let tex: Texture2D = new Texture2D(data.width, data.height, 1, false, false);
-					tex.wrapModeU = BaseTexture.WARPMODE_CLAMP;
-					tex.wrapModeV = BaseTexture.WARPMODE_CLAMP;
-					tex.loadImageSource(data, true);
-					tex._setCreateURL(data.src);
-					data = tex;
+				var url: string;
+				if (!(data instanceof Texture2D)) {
+					if (data instanceof ArrayBuffer) {
+						url = this._http ? this._http.url : this._url;
+						var ext: string = Utils.getFileExtension(url);
+						let format: TextureFormat;
+						switch (ext) {
+							case "ktx":
+								format = TextureFormat.ETC1RGB;
+								break;
+							case "pvr":
+								format = TextureFormat.PVRTCRGBA_4BPPV;
+								break;
+							default: {
+								console.error('unknown format', ext);
+								return;
+							}
+						}
+						let tex = new Texture2D(0, 0, format, false, false);
+						tex.wrapModeU = WarpMode.Clamp;
+						tex.wrapModeV = WarpMode.Clamp;
+						tex.setCompressData(data);
+						tex._setCreateURL(url);
+						data = tex;
+					} else {
+						let tex: Texture2D = new Texture2D(data.width, data.height, 1, false, false);
+						tex.wrapModeU = WarpMode.Clamp;
+						tex.wrapModeV = WarpMode.Clamp;
+						tex.loadImageSource(data, true);
+						tex._setCreateURL(data.src);
+						data = tex;
+					}
 				}
 				this._data.pics.push(data);
 				if (this._data.toLoads.length > 0) {
 					this.event(Event.PROGRESS, 0.3 + 1 / this._data.toLoads.length * 0.6);
 					//有图片未加载
-					return this._loadResourceFilter(Loader.IMAGE, this._data.toLoads.pop());
+					var url = URL.formatURL(this._data.toLoads.pop());
+					var ext = Utils.getFileExtension(url);
+					var type = Loader.IMAGE;
+					if (ext == "pvr" || ext == "ktx") {
+						type = Loader.BUFFER;
+					}
+					return this._loadResourceFilter(type, url);
 				}
 				var frames: any = this._data.frames;
 				var cleanUrl: string = this._url.split("?")[0];
@@ -490,7 +538,7 @@ export class Loader extends EventDispatcher {
 					for (var name in frames) {
 						var obj: any = frames[name];//取对应的图
 						var tPic: Texture2D = pics[obj.frame.idx ? obj.frame.idx : 0];//是否释放
-						var url = URL.formatURL(directory + name);
+						url = directory + name;
 						((<any>tPic)).scaleRate = scaleRate;
 						var tTexture: Texture;
 						tTexture = Texture._create(tPic, obj.frame.x, obj.frame.y, obj.frame.w, obj.frame.h, obj.spriteSourceSize.x, obj.spriteSourceSize.y, obj.sourceSize.w, obj.sourceSize.h, Loader.getRes(url));
@@ -502,7 +550,7 @@ export class Loader extends EventDispatcher {
 					for (name in frames) {
 						obj = frames[name];//取对应的图
 						tPic = pics[obj.frame.idx ? obj.frame.idx : 0];//是否释放
-						url = URL.formatURL(directory + name);
+						url = directory + name;
 						tTexture = Texture._create(tPic, obj.frame.x, obj.frame.y, obj.frame.w, obj.frame.h, obj.spriteSourceSize.x, obj.spriteSourceSize.y, obj.sourceSize.w, obj.sourceSize.h, Loader.getRes(url));
 						Loader.cacheTexture(url, tTexture);
 						tTexture.url = url;
@@ -518,7 +566,7 @@ export class Loader extends EventDispatcher {
 			if (!data._source) {
 				this._data = data;
 				this.event(Event.PROGRESS, 0.5);
-				return this._loadResourceFilter(Loader.IMAGE,this._url.replace(".fnt", ".png"));
+				return this._loadResourceFilter(Loader.IMAGE, this._url.replace(".fnt", ".png"));
 			} else {
 				var bFont = new BitmapFont();
 				bFont.parseFont(this._data, new Texture(data));
@@ -644,38 +692,37 @@ export class Loader extends EventDispatcher {
 		return this._data;
 	}
 
-    /**
-     * 清理指定资源地址的缓存。 
-     * @param url 资源地址。
-     */
-    static clearRes(url: string): void {
-		url = URL.formatURL(url);
+	/**
+	 * 清理指定资源地址的缓存。 
+	 * @param url 资源地址。
+	 */
+	static clearRes(url: string): void {
+		url = URL.formatURL(url);
 		//删除图集
-		var arr = Loader.getAtlas(url);
-		if (arr) {
-			for (var i= 0, n = arr.length; i < n; i++) {
-				var resUrl = arr[i];
-				var tex: Texture = Loader.getRes(resUrl);
-				delete Loader.textureMap[resUrl];
-				if (tex) tex.destroy();
+		var arr = Loader.getAtlas(url);
+		if (arr) {
+			for (var i = 0, n = arr.length; i < n; i++) {
+				var resUrl = arr[i];
+				var tex: Texture = Loader.getRes(resUrl);
+				delete Loader.textureMap[resUrl];
+				if (tex) tex.destroy();
 			}
-			arr.length = 0;
-			delete Loader.atlasMap[url];
+			arr.length = 0;
+			delete Loader.atlasMap[url];
 		}
-		var texture = Loader.textureMap[url];
-		if (texture) {
+		var texture = Loader.textureMap[url];
+		if (texture) {
 			texture.destroy();
-			delete Loader.textureMap[url]
+			delete Loader.textureMap[url]
 		}
-		var res= Loader.loadedMap[url];
-		(res) && (delete Loader.loadedMap[url])
+		var res = Loader.loadedMap[url];
+		(res) && (delete Loader.loadedMap[url])
 	}
 
 	/**
 	 * 销毁Texture使用的图片资源，保留texture壳，如果下次渲染的时候，发现texture使用的图片资源不存在，则会自动恢复
 	 * 相比clearRes，clearTextureRes只是清理texture里面使用的图片资源，并不销毁texture，再次使用到的时候会自动恢复图片资源
 	 * 而clearRes会彻底销毁texture，导致不能再使用；clearTextureRes能确保立即销毁图片资源，并且不用担心销毁错误，clearRes则采用引用计数方式销毁
-	 * 【注意】如果图片本身在自动合集里面（默认图片小于512*512），内存是不能被销毁的，此图片被大图合集管理器管理
 	 * @param	url	图集地址或者texture地址，比如 Loader.clearTextureRes("res/atlas/comp.atlas"); Loader.clearTextureRes("hall/bg.jpg");
 	 */
 	static clearTextureRes(url: string): void {
@@ -723,6 +770,7 @@ export class Loader extends EventDispatcher {
 
 	/**
 	 * 缓存资源。
+	 * 如果资源已经存在则缓存失败。
 	 * @param	url 资源地址。
 	 * @param	data 要缓存的内容。
 	 */
@@ -739,6 +787,15 @@ export class Loader extends EventDispatcher {
 				Loader.loadedMap[url] = data;
 			}
 		}
+	}
+
+	/**
+	 * 强制缓存资源。不做任何检查。
+	 * @param url  资源地址。
+	 * @param data  要缓存的内容。
+	 */
+	static cacheResForce(url: string, data: any) {
+		Loader.loadedMap[url] = data;
 	}
 
 

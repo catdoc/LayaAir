@@ -9,7 +9,6 @@ import { Text } from "./laya/display/Text";
 import { KeyBoardManager } from "./laya/events/KeyBoardManager";
 import { MouseManager } from "./laya/events/MouseManager";
 import { LayaGL } from "./laya/layagl/LayaGL";
-import { LayaGLRunner } from "./laya/layagl/LayaGLRunner";
 import { AudioSound } from "./laya/media/h5audio/AudioSound";
 import { SoundManager } from "./laya/media/SoundManager";
 import { WebAudioSound } from "./laya/media/webaudio/WebAudioSound";
@@ -88,7 +87,9 @@ export class Laya {
 	/** 加载管理器的引用。*/
 	static loader: LoaderManager = null;
 	/** 当前引擎版本。*/
-	static version: string = "2.6.1beta";
+
+	static version: string = "2.13.5";
+
 	/**@private Render 类的引用。*/
 	static render: Render;
 	/**@internal */
@@ -162,7 +163,7 @@ export class Laya {
 	 * @param	plugins 插件列表，比如 WebGL（使用WebGL方式渲染）。
 	 * @return	返回原生canvas引用，方便对canvas属性进行修改
 	 */
-	static init(width: number, height: number, ...plugins): any {
+	static init(width: number, height: number, ...plugins: any[]): any {
 		if (Laya._isinit) return;
 		Laya._isinit = true;
 		ArrayBuffer.prototype.slice || (ArrayBuffer.prototype.slice = Laya._arrayBufferSlice);
@@ -172,10 +173,7 @@ export class Laya {
 		//这个其实在Render中感觉更合理，但是runtime要求第一个canvas是主画布，所以必须在下面的那个离线画布之前
 		var mainCanv = Browser.mainCanvas = new HTMLCanvas(true);
 		//Render._mainCanvas = mainCanv;
-		var style: any = mainCanv.source.style;
-		style.position = 'absolute';
-		style.top = style.left = "0px";
-		style.background = "#000000";
+		Laya._setStyleInfo(mainCanv);
 
 		if (!Browser.onKGMiniGame && !Browser.onAlipayMiniGame) {
 			Browser.container.appendChild(mainCanv.source);//xiaosong add
@@ -233,7 +231,7 @@ export class Laya {
 		MeshQuadTexture.__int__();
 		MeshVG.__init__();
 		MeshTexture.__init__();
-		Laya.render = new Render(0, 0, Browser.mainCanvas);
+		Laya.render = Laya.createRender();
 		render = Laya.render;
 		Laya.stage.size(width, height);
 		((<any>window)).stage = Laya.stage;
@@ -256,13 +254,25 @@ export class Laya {
 		return Render.canvas;
 	}
 
+	/**
+	 * @internal
+	 * 适配淘宝小游戏
+	 * @param mainCanv 
+	 */
+	static _setStyleInfo(mainCanv: HTMLCanvas): void {
+		let style: any = mainCanv.source.style;
+		style.position = 'absolute';
+		style.top = style.left = "0px";
+		style.background = "#000000";
+	}
+
+	static createRender(): any {
+		return new Render(0, 0, Browser.mainCanvas);
+	}
+
 	/**@internal */
-	static _getUrlPath(): string {
-		var location: any = Browser.window.location;
-		var pathName: string = location.pathname;
-		// 索引为2的字符如果是':'就是windows file协议
-		pathName = pathName.charAt(2) == ':' ? pathName.substring(1) : pathName;
-		return URL.getPath(location.protocol == "file:" ? pathName : location.protocol + "//" + location.host + location.pathname);
+	static _getUrlPath(): string {//不再需要特殊处理file的路径
+		return URL.getPath(location.protocol + "//" + location.host + location.pathname);
 	}
 
 	/**@internal */
@@ -302,15 +312,15 @@ export class Laya {
 	 * @param	debugJsPath laya.debugtool.js文件路径
 	 */
 	static enableDebugPanel(debugJsPath: string = "libs/laya.debugtool.js"): void {
-		if (!window['Laya']["DebugPanel"]) {
+		if (!(window as any)['Laya']["DebugPanel"]) {
 			var script: any = Browser.createElement("script");
 			script.onload = function (): void {
-				window['Laya']["DebugPanel"].enable();
+				(window as any)['Laya']["DebugPanel"].enable();
 			}
 			script.src = debugJsPath;
 			Browser.document.body.appendChild(script);
 		} else {
-			window['Laya']["DebugPanel"].enable();
+			(window as any)['Laya']["DebugPanel"].enable();
 		}
 	}
 
@@ -323,6 +333,7 @@ export class Laya {
 	private static enableNative(): void {
 		if (Laya.isNativeRender_enable)
 			return;
+		Config.useRetinalCanvas = true;
 		Laya.isNativeRender_enable = true;
 		if (Render.supportWebGLPlusRendering) {
 			Shader.prototype.uploadTexture2D = function (value: any): void {
@@ -333,8 +344,8 @@ export class Laya {
 		RenderState2D.width = Browser.window.innerWidth;
 		RenderState2D.height = Browser.window.innerHeight;
 		Browser.measureText = function (txt: string, font: string): any {
-			window["conchTextCanvas"].font = font;
-			return window["conchTextCanvas"].measureText(txt);
+			(window as any)["conchTextCanvas"].font = font;
+			return (window as any)["conchTextCanvas"].measureText(txt);
 		}
 
 		Stage.clear = function (color: string): void {
@@ -345,7 +356,7 @@ export class Laya {
 			gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
 			RenderState2D.clear();
 		}
-		Sprite.drawToCanvas = Sprite.drawToTexture = function (sprite: Sprite, _renderType: number, canvasWidth: number, canvasHeight: number, offsetX: number, offsetY: number): any {
+		Sprite.drawToCanvas = function (sprite: Sprite, _renderType: number, canvasWidth: number, canvasHeight: number, offsetX: number, offsetY: number): any {
 			offsetX -= sprite.x;
 			offsetY -= sprite.y;
 			offsetX |= 0;
@@ -377,6 +388,7 @@ export class Laya {
 		);
 		HTMLCanvas.prototype.getTexture = function (): Texture {
 			if (!this._texture) {
+				//@ts-ignore
 				this._texture = this.context._targets;
 				this._texture.uv = RenderTexture2D.flipyuv;
 				this._texture.bitmap = this._texture;

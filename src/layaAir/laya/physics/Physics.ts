@@ -16,7 +16,6 @@ import { MouseJoint } from "./joint/MouseJoint"
 import { PrismaticJoint } from "./joint/PrismaticJoint"
 import { PulleyJoint } from "./joint/PulleyJoint"
 import { RevoluteJoint } from "./joint/RevoluteJoint"
-import { RopeJoint } from "./joint/RopeJoint"
 import { WeldJoint } from "./joint/WeldJoint"
 import { WheelJoint } from "./joint/WheelJoint"
 import { ClassUtils } from "../utils/ClassUtils"
@@ -100,7 +99,11 @@ export class Physics extends EventDispatcher {
     }
 
     private _update(): void {
-        this.world.Step(1 / 60, this.velocityIterations, this.positionIterations, 3);
+        var delta = Laya.timer.delta / 1000;
+        if (delta > .033) { // 时间步太长，会导致错误穿透
+            delta = .033;
+        }
+        this.world.Step(delta, this.velocityIterations, this.positionIterations, 3);
         var len: number = this._eventList.length;
         if (len > 0) {
             for (var i: number = 0; i < len; i += 2) {
@@ -241,7 +244,8 @@ export class Physics extends EventDispatcher {
     }
 
     /**物理世界根容器，将根据此容器作为物理世界坐标世界，进行坐标变换，默认值为stage
-     * 设置特定容器后，就可整体位移物理对象，保持物理世界不变*/
+     * 设置特定容器后，就可整体位移物理对象，保持物理世界不变。
+     * 注意，仅会在 set worldRoot 时平移一次，其他情况请配合 updatePhysicsByWorldRoot 函数使用*/
     get worldRoot(): Sprite {
         return this._worldRoot || Laya.stage;
     }
@@ -251,7 +255,17 @@ export class Physics extends EventDispatcher {
         if (value) {
             //TODO：
             var p: Point = value.localToGlobal(Point.TEMP.setTo(0, 0));
-            this.world.ShiftOrigin({ x: p.x / Physics.PIXEL_RATIO, y: p.y / Physics.PIXEL_RATIO });
+            this.world.ShiftOrigin({ x: -p.x / Physics.PIXEL_RATIO, y: -p.y / Physics.PIXEL_RATIO });
+        }
+    }
+
+    /**
+     * 设定 worldRoot 后，手动触发物理世界更新
+     */
+    updatePhysicsByWorldRoot() {
+        if (!!this.worldRoot) {
+            var p: Point = this.worldRoot.localToGlobal(Point.TEMP.setTo(0, 0));
+            this.world.ShiftOrigin({ x: -p.x / Physics.PIXEL_RATIO, y: -p.y / Physics.PIXEL_RATIO });
         }
     }
 }

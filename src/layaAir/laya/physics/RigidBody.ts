@@ -41,7 +41,8 @@ export class RigidBody extends Component {
     protected _allowRotation: boolean = true;
     /**重力缩放系数，设置为0为没有重力*/
     protected _gravityScale: number = 1;
-
+    /** @internal */
+    static _tempPoint: Point = new Point();
     /**[只读] 指定了该主体所属的碰撞组，默认为0，碰撞规则如下：
      * 1.如果两个对象group相等
      * 		group值大于零，它们将始终发生碰撞
@@ -150,25 +151,25 @@ export class RigidBody extends Component {
      * @param prop 
      * @param accessor 
      */
-    private accessGetSetFunc(obj: Object, prop: string, accessor: string): any {
+    private accessGetSetFunc(obj: Node, prop: string, accessor: string): any {
         if (["get", "set"].indexOf(accessor) === -1) { // includes
             return;
         }
         let privateProp = `_$${accessor}_${prop}`;
-        if (obj[privateProp]) {
-            return obj[privateProp];
+        if ((obj as any)[privateProp]) {
+            return (obj as any)[privateProp];
         }
         let ObjConstructor = obj.constructor;
         let des;
         while (ObjConstructor) {
             des = Object.getOwnPropertyDescriptor(ObjConstructor.prototype, prop);
-            if (des && des[accessor]) { // 构造函数(包括原型的构造函数)有该属性
-                obj[privateProp] = des[accessor].bind(obj);
+            if (des && (des as any)[accessor]) { // 构造函数(包括原型的构造函数)有该属性
+                (obj as any)[privateProp] = (des as any)[accessor].bind(obj);
                 break;
             }
             ObjConstructor = Object.getPrototypeOf(ObjConstructor);
         }
-        return obj[privateProp];
+        return (obj as any)[privateProp];
     }
 
     /**
@@ -198,18 +199,19 @@ export class RigidBody extends Component {
             //if (label == "tank") console.log("get",ang);
             this.accessGetSetFunc(sp, "rotation", "set")(Utils.toAngle(ang) - (<Sprite>sp.parent).globalRotation);
 
-            if (ang == 0) {
-                var point: Point = sp.parent.globalToLocal(Point.TEMP.setTo(pos.x * IPhysics.Physics.PIXEL_RATIO + sp.pivotX, pos.y * IPhysics.Physics.PIXEL_RATIO + sp.pivotY), false, IPhysics.Physics.I.worldRoot);
-                this.accessGetSetFunc(sp, "x", "set")(point.x);
-                this.accessGetSetFunc(sp, "y", "set")(point.y);
-            } else {
-                point = sp.globalToLocal(Point.TEMP.setTo(pos.x * IPhysics.Physics.PIXEL_RATIO, pos.y * IPhysics.Physics.PIXEL_RATIO), false, IPhysics.Physics.I.worldRoot);
+            // if (ang == 0) {
+            //     var point: Point = sp.globalToLocal(Point.TEMP.setTo(pos.x * IPhysics.Physics.PIXEL_RATIO + sp.pivotX, pos.y * IPhysics.Physics.PIXEL_RATIO + sp.pivotY), false, IPhysics.Physics.I.worldRoot);
+            //     point = sp.toParentPoint(point);
+            //     this.accessGetSetFunc(sp, "x", "set")(point.x);
+            //     this.accessGetSetFunc(sp, "y", "set")(point.y);
+            // } else {
+                var point = sp.globalToLocal(Point.TEMP.setTo(pos.x * IPhysics.Physics.PIXEL_RATIO, pos.y * IPhysics.Physics.PIXEL_RATIO), false, IPhysics.Physics.I.worldRoot);
                 point.x += sp.pivotX;
                 point.y += sp.pivotY;
                 point = sp.toParentPoint(point);
                 this.accessGetSetFunc(sp, "x", "set")(point.x);
                 this.accessGetSetFunc(sp, "y", "set")(point.y);
-            }
+            // }
         }
     }
 
@@ -229,7 +231,7 @@ export class RigidBody extends Component {
     }
 
     /**@private */
-    private _overSet(sp: Sprite, prop: string, getfun: any): void {
+    private _overSet(sp: Node, prop: string, getfun: any): void {
         Object.defineProperty(sp, prop, { get: this.accessGetSetFunc(sp, prop, "get"), set: getfun, enumerable: false, configurable: true });;
     }
     /**
@@ -346,9 +348,10 @@ export class RigidBody extends Component {
     getCenter(): any {
         if (!this._body) this._onAwake();
         var p: Point = this._body.GetLocalCenter();
-        p.x = p.x * IPhysics.Physics.PIXEL_RATIO;
-        p.y = p.y * IPhysics.Physics.PIXEL_RATIO;
-        return p;
+        RigidBody._tempPoint.copy(p);
+        RigidBody._tempPoint.x = RigidBody._tempPoint.x * IPhysics.Physics.PIXEL_RATIO;
+        RigidBody._tempPoint.y = RigidBody._tempPoint.y * IPhysics.Physics.PIXEL_RATIO;
+        return RigidBody._tempPoint;
     }
 
     /**
@@ -357,9 +360,10 @@ export class RigidBody extends Component {
     getWorldCenter(): any {
         if (!this._body) this._onAwake();
         var p: Point = this._body.GetWorldCenter();
-        p.x = p.x * IPhysics.Physics.PIXEL_RATIO;
-        p.y = p.y * IPhysics.Physics.PIXEL_RATIO;
-        return p;
+        RigidBody._tempPoint.copy(p);
+        RigidBody._tempPoint.x = RigidBody._tempPoint.x * IPhysics.Physics.PIXEL_RATIO;
+        RigidBody._tempPoint.y = RigidBody._tempPoint.y * IPhysics.Physics.PIXEL_RATIO;
+        return RigidBody._tempPoint;
     }
 
     /**

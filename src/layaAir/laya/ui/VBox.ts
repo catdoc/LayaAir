@@ -39,6 +39,9 @@ export class VBox extends LayoutBox {
         return super.width;
     }
 
+    /** 兼容以前的changeItems逻辑，是否在发生变动时，使用 sortItem 排序所有item */
+    public isSortItem:boolean = false;
+
     /** 
      * @inheritDoc	
      * @override
@@ -46,22 +49,25 @@ export class VBox extends LayoutBox {
     protected changeItems(): void {
         this._itemChanged = false;
         var items: any[] = [];
-        var maxWidth: number = 0;
+        var maxWidth = 0;
 
-        for (var i: number = 0, n: number = this.numChildren; i < n; i++) {
-            var item: UIComponent = (<UIComponent>this.getChildAt(i));
+        for (var i = 0, n = this.numChildren; i < n; i++) {
+            var item = (<UIComponent>this.getChildAt(i));
             if (item) {
                 items.push(item);
-                maxWidth = this._width ? this._width : Math.max(maxWidth, item.width * item.scaleX);
+                maxWidth = Math.max(maxWidth, item.width * item.scaleX);
             }
         }
-
-        this.sortItem(items);
-        var top: number = 0;
+        if (this.isSortItem) {
+            this.sortItem(items);
+        }
+        var top = 0;
         for (i = 0, n = items.length; i < n; i++) {
             item = items[i];
-            item.y = top;
-            top += item.height * item.scaleY + this._space;
+
+            i && (top += (items[i - 1].height * items[i - 1].scaleX) + this._space);
+            item.top = top;
+
             if (this._align == VBox.LEFT) {
                 item.x = 0;
             } else if (this._align == VBox.CENTER) {
@@ -69,6 +75,8 @@ export class VBox extends LayoutBox {
             } else if (this._align == VBox.RIGHT) {
                 item.x = maxWidth - item.width * item.scaleX;
             }
+             //@charley:修正轴心点偏移的位置处理
+             item.pivotX && (item.x += item.pivotX * item.scaleX);
         }
         this._sizeChanged();
     }

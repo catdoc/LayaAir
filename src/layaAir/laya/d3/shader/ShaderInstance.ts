@@ -6,7 +6,6 @@ import { BaseTexture } from "../../resource/BaseTexture";
 import { Resource } from "../../resource/Resource";
 import { Stat } from "../../utils/Stat";
 import { WebGLContext } from "../../webgl/WebGLContext";
-import { BaseCamera } from "../core/BaseCamera";
 import { Material } from "../core/material/Material";
 import { RenderState } from "../core/material/RenderState";
 import { BaseRender } from "../core/render/BaseRender";
@@ -26,9 +25,11 @@ import { ShaderVariable } from "./ShaderVariable";
  */
 export class ShaderInstance extends Resource {
 	/**@internal */
-	private _attributeMap: any;
+	private _attributeMap: { [key: string]: number };
 	/**@internal */
-	private _uniformMap: any;
+	private _uniformMap: { [key: string]: number };
+	/**@internal miner 动态添加的uniformMap*/
+	private _globaluniformMap: { [key: string]: number };
 	/**@internal */
 	private _shaderPass: ShaderPass;
 
@@ -83,6 +84,7 @@ export class ShaderInstance extends Resource {
 		this._attributeMap = attributeMap;
 		this._uniformMap = uniformMap;
 		this._shaderPass = shaderPass;
+		this._globaluniformMap = {};
 		this._create();
 		this.lock = true;
 	}
@@ -154,6 +156,12 @@ export class ShaderInstance extends Resource {
 						throw new Error("Shader3D: period is unkonw.");
 				}
 			}
+			else {
+				//没有涉及到的uniform加入sceneParms,全局传入
+				one.dataOffset = Shader3D.propertyNameToID(uniName);
+				this._globaluniformMap[uniName] = Shader3D.PERIOD_SCENE;
+				sceneParms.push(one);
+			}
 		}
 
 		//Native版本分别存入funid、webglFunid,location、type、offset, +4是因为第一个存长度了 所以是*4*5+4
@@ -178,8 +186,7 @@ export class ShaderInstance extends Resource {
 			var custom: ShaderVariable = customParms[i];
 			this._customUniformParamsMap[custom.dataOffset] = custom;
 		}
-
-		var stateMap: object = this._shaderPass._stateMap;
+		var stateMap: { [key: string]: number } = this._shaderPass._stateMap;
 		for (var s in stateMap)
 			this._stateParamsMap[stateMap[s]] = Shader3D.propertyNameToID(s);
 	}
@@ -558,9 +565,17 @@ export class ShaderInstance extends Resource {
 		var depthWrite: any = this._getRenderState(datas, Shader3D.RENDER_STATE_DEPTH_WRITE);
 		var depthTest: any = this._getRenderState(datas, Shader3D.RENDER_STATE_DEPTH_TEST);
 		var blend: any = this._getRenderState(datas, Shader3D.RENDER_STATE_BLEND);
+		var stencilRef: any = this._getRenderState(datas, Shader3D.RENDER_STATE_STENCIL_REF);
+		var stencilTest: any = this._getRenderState(datas, Shader3D.RENDER_STATE_STENCIL_TEST);
+		var stencilWrite: any = this._getRenderState(datas, Shader3D.RENDER_STATE_STENCIL_WRITE);
+		var stencilOp: any = this._getRenderState(datas, Shader3D.RENDER_STATE_STENCIL_OP);
 		depthWrite == null && (depthWrite = renderState.depthWrite);
 		depthTest == null && (depthTest = renderState.depthTest);
 		blend == null && (blend = renderState.blend);
+		stencilRef == null && (stencilRef = renderState.stencilRef);
+		stencilTest == null && (stencilTest = renderState.stencilTest);
+		stencilWrite == null && (stencilWrite = renderState.stencilWrite);
+		stencilOp == null && (stencilOp = renderState.stencilOp);
 
 		WebGLContext.setDepthMask(gl, depthWrite);
 		if (depthTest === RenderState.DEPTHTEST_OFF)
@@ -569,7 +584,7 @@ export class ShaderInstance extends Resource {
 			WebGLContext.setDepthTest(gl, true);
 			WebGLContext.setDepthFunc(gl, depthTest);
 		}
-
+		//blend
 		switch (blend) {
 			case RenderState.BLEND_DISABLE:
 				WebGLContext.setBlend(gl, false);
@@ -603,6 +618,20 @@ export class ShaderInstance extends Resource {
 				WebGLContext.setBlendFuncSeperate(gl, srcRGB, dstRGB, srcAlpha, dstAlpha);
 				break;
 		}
+
+		//Stencil
+		WebGLContext.setStencilMask(gl, stencilWrite);
+		if (stencilTest == RenderState.STENCILTEST_OFF) {
+			WebGLContext.setStencilTest(gl, false);
+		} else {
+			WebGLContext.setStencilTest(gl, true);
+			WebGLContext.setStencilFunc(gl, stencilTest, stencilRef);
+
+		}
+		WebGLContext.setstencilOp(gl, stencilOp.x, stencilOp.y, stencilOp.z);
+
+
+
 	}
 
 	/**

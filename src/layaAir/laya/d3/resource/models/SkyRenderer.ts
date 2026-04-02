@@ -11,7 +11,6 @@ import { Vector3 } from "../../math/Vector3";
 import { DefineDatas } from "../../shader/DefineDatas";
 import { ShaderData } from "../../shader/ShaderData";
 import { ShaderInstance } from "../../shader/ShaderInstance";
-import { RenderTexture } from "../RenderTexture";
 import { SkyBox } from "./SkyBox";
 import { SkyMesh } from "./SkyMesh";
 
@@ -91,6 +90,9 @@ export class SkyRenderer {
 			WebGLContext.setCullFace(gl, false);
 			WebGLContext.setDepthFunc(gl, gl.LEQUAL);
 			WebGLContext.setDepthMask(gl, false);
+			//模板设置
+			WebGLContext.setStencilMask(gl,false);
+
 			var comDef: DefineDatas = SkyRenderer._compileDefine;
 			this._material._shaderValues._defineDatas.cloneTo(comDef);
 			var shader: ShaderInstance = context.shader = this._material._shader.getSubShaderAt(0)._passes[0].withCompile(comDef);//TODO:调整SubShader代码
@@ -103,7 +105,6 @@ export class SkyRenderer {
 				shader._uploadScene = scene;
 			}
 
-			var renderTex: RenderTexture = camera._getRenderTexture();
 			var uploadCamera: boolean = (shader._uploadCameraShaderValue !== cameraShaderValue) || switchShaderLoop;
 			if (uploadCamera || switchShader) {
 				var viewMatrix: Matrix4x4 = SkyRenderer._tempMatrix0;
@@ -142,8 +143,12 @@ export class SkyRenderer {
 				projectionMatrix.elements[10] = epsilon - 1.0;
 				projectionMatrix.elements[11] = -1.0;
 				projectionMatrix.elements[14] = -0;//znear无穷小
-
-				(<Camera>camera)._applyViewProject(context, viewMatrix, projectionMatrix);//TODO:优化 不应设置给Camera直接提交
+				if((camera as any).isWebXR){
+					(<Camera>camera)._applyViewProject(context, viewMatrix, camera.projectionMatrix);//TODO:优化 不应设置给Camera直接提交
+				}else{
+					(<Camera>camera)._applyViewProject(context, viewMatrix, projectionMatrix);//TODO:优化 不应设置给Camera直接提交
+				}
+				
 				shader.uploadUniforms(shader._cameraUniformParamsMap, cameraShaderValue, uploadCamera);
 				shader._uploadCameraShaderValue = cameraShaderValue;
 			}
